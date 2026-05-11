@@ -9,7 +9,6 @@ import sys
 
 from ollama import Client
 
-from .utils.parse_n_print_response import parse_n_print_response
 from .utils.prompts import WEB_BUG_BOUNTY_AGENT as SYSTEM_PROMPT
 from .utils.agent_configs import get_ai_specific_default_model, get_api_key
 from .utils.tools import get_tools_info
@@ -167,7 +166,6 @@ def main(prompt=None):
 
             response, chat_history = ask(history=chat_history, user_input=prompt, tools=TOOLS_INFO)
 
-            parse_n_print_response(response)
             prompt = None
 
         except KeyboardInterrupt:

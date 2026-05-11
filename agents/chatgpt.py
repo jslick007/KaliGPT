@@ -9,7 +9,6 @@ import json
 from openai import OpenAI
 import sys
 
-from .utils.parse_n_print_response import parse_n_print_response
 from .utils.prompts import WEB_BUG_BOUNTY_AGENT as SYSTEM_PROMPT
 from .utils.agent_configs import get_api_key, get_ai_specific_default_model
 from .utils.tools import get_tools_info
@@ -150,7 +149,6 @@ def main(prompt=None):
             )
 
             # print(f"\nAgent ➤ ")
-            parse_n_print_response(chatgpt_response)
             prompt = None
 
         except KeyboardInterrupt:

@@ -10,7 +10,6 @@ from google.genai import types
 import sys
 import time
 
-from .utils.parse_n_print_response import parse_n_print_response
 from .utils.prompts import WEB_BUG_BOUNTY_AGENT as SYSTEM_PROMPT
 from .utils.agent_configs import get_api_key, get_ai_specific_default_model
 from .utils.tools import get_tools_info
@@ -81,13 +80,13 @@ def get_gemini_response(history: list[types.Content], new_input: str, tools: lis
     tool_call_count = 0
 
     while True:
+        print("... requesting stream ...", end="\r")
         stream = retry_stream(
             lambda: client.models.generate_content_stream(
                 model=GEMINI_MODEL,
                 contents=contents,
                 config=types.GenerateContentConfig(
                     tools=tools,
-                    thinking_config=types.ThinkingConfig(thinking_budget=1),
                     system_instruction=current_system_instruction,
                 ),
             )
@@ -95,20 +94,35 @@ def get_gemini_response(history: list[types.Content], new_input: str, tools: lis
 
         full_text = ""
         function_calls = None
-        for chunk in stream:
-            has_fc = chunk.function_calls
-            if has_fc:
-                function_calls = has_fc
-            if not has_fc:
-                try:
-                    if chunk.text:
-                        print(chunk.text, end="", flush=True)
-                        full_text += chunk.text
-                except (ValueError, AttributeError):
-                    pass
-        print()
+        
+        # Debug: check if stream is actually a generator
+        if stream is None:
+            print("\n[!] Error: retry_stream returned None")
+            return "Error: No response stream", contents
 
-        current_system_instruction = None
+        for chunk in stream:
+            if not chunk.candidates:
+                continue
+            
+            content = chunk.candidates[0].content
+            if not content or not content.parts:
+                continue
+
+            for part in content.parts:
+                if part.function_call:
+                    # Accumulate function calls
+                    if function_calls is None:
+                        function_calls = []
+                    function_calls.append(part.function_call)
+                elif part.text:
+                    try:
+                        print(part.text, end="", flush=True)
+                        full_text += part.text
+                    except (ValueError, AttributeError):
+                        pass
+        print()
+        print(f"Stream ended. Length: {len(full_text)} chars. Tool calls: {bool(function_calls)}")
+
 
         if function_calls and tool_call_count < MAX_TOOL_CALLS:
             tool_call_count += 1
@@ -150,7 +164,6 @@ def main(prompt=None):
             )
 
             # print(f"\nAgent ➤ ")
-            parse_n_print_response(gemini_response)
             prompt = None
 
         except KeyboardInterrupt:

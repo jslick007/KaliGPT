@@ -13,7 +13,6 @@ from openai import OpenAI
 
 from .utils.agent_configs import get_api_key, get_ai_specific_default_model
 from .utils.agent_management import AI_MANAGEMENT_OPTIONS, agent_management
-from .utils.parse_n_print_response import parse_n_print_response
 from .utils.tools import get_tools_info
 from .utils.openai_tool_adapter import openai_tool_adapter
 from .utils.prompts import WEB_BUG_BOUNTY_AGENT as SYSTEM_PROMPT
@@ -208,7 +207,6 @@ def main(prompt=None):
             response, chat_history = ask(chat_history=chat_history, prompt=prompt, tools=TOOLS_INFO)
 
             # print(f"\nAgent ➤ ")
-            parse_n_print_response(response)
             prompt = None
 
         except KeyboardInterrupt:
