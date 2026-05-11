@@ -15,7 +15,7 @@ from .utils.prompts import WEB_BUG_BOUNTY_AGENT as SYSTEM_PROMPT
 from .utils.agent_configs import get_api_key, get_ai_specific_default_model
 from .utils.tools import get_tools_info
 from .utils.agent_management import agent_management, AI_MANAGEMENT_OPTIONS
-from .utils.debug_logger import log_llm_request, log_llm_response
+from .utils.retry import retry_stream
 
 # --- GLOBAL VARIABLES ---
 GEMINI_API_KEY: str
@@ -31,7 +31,7 @@ def initialize_configs():
         GEMINI_API_KEY = get_api_key("gemini")
         GEMINI_MODEL = get_ai_specific_default_model("gemini")
 
-        if not GEMINI_API_KEY or 'AIza' not in GEMINI_API_KEY:
+        if not GEMINI_API_KEY or "AIza" not in GEMINI_API_KEY:
             print("[!] GEMINI API Key not Found. exiting!")
             sys.exit(0)
 
@@ -66,9 +66,7 @@ def execute_function_calls(function_calls: list):
                 result_text = f"Tool execution failed with error: {e}"
         else:
             result_text = f"Tool {func_name} not found in map!"
-        response_parts.append(
-            types.Part.from_function_response(name=func_name, response={"result": result_text})
-        )
+        response_parts.append(types.Part.from_function_response(name=func_name, response={"result": result_text}))
         print("[HackerX Tool Use] Tool result ready to send back.")
     return response_parts
 
@@ -78,22 +76,21 @@ MAX_TOOL_CALLS = 10
 
 def get_gemini_response(history: list[types.Content], new_input: str, tools: list):
     contents = history[:]
-    contents.append(
-        types.Content(role="user", parts=[types.Part.from_text(text=new_input)])
-    )
+    contents.append(types.Content(role="user", parts=[types.Part.from_text(text=new_input)]))
     current_system_instruction = SYSTEM_PROMPT
     tool_call_count = 0
 
     while True:
-        log_llm_request("Gemini", contents)
-        stream = client.models.generate_content_stream(
-            model=GEMINI_MODEL,
-            contents=contents,
-            config=types.GenerateContentConfig(
-                tools=tools,
-                thinking_config=types.ThinkingConfig(thinking_budget=1),
-                system_instruction=current_system_instruction
-            ),
+        stream = retry_stream(
+            lambda: client.models.generate_content_stream(
+                model=GEMINI_MODEL,
+                contents=contents,
+                config=types.GenerateContentConfig(
+                    tools=tools,
+                    thinking_config=types.ThinkingConfig(thinking_budget=1),
+                    system_instruction=current_system_instruction,
+                ),
+            )
         )
 
         full_text = ""
@@ -119,28 +116,22 @@ def get_gemini_response(history: list[types.Content], new_input: str, tools: lis
             parts = []
             if full_text:
                 parts.append(types.Part.from_text(text=full_text))
-            parts.extend([
-                types.Part.from_function_call(name=fc.name, args=dict(fc.args)) for fc in function_calls
-            ])
+            parts.extend([types.Part.from_function_call(name=fc.name, args=dict(fc.args)) for fc in function_calls])
             contents.append(types.Content(role="model", parts=parts))
             contents.append(types.Content(role="tool", parts=function_response_parts))
             time.sleep(0.5)
             continue
 
-        contents.append(types.Content(
-            role="model",
-            parts=[types.Part.from_text(text=full_text)]
-        ))
-        log_llm_response("Gemini", full_text)
+        contents.append(types.Content(role="model", parts=[types.Part.from_text(text=full_text)]))
         return full_text, contents
 
 
 def main(prompt=None):
-    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
     chat_history: list[types.Content] = []
 
-    initialize_configs()   # initialize configs for gemini
+    initialize_configs()  # initialize configs for gemini
 
     # Print tool banner
     print(f"> HackerX ( Gemini/{GEMINI_MODEL} )")
@@ -149,16 +140,13 @@ def main(prompt=None):
             if prompt is None:
                 prompt = input("\nYou > ")
 
-
             if prompt.lower().replace("-", " ").strip() in AI_MANAGEMENT_OPTIONS:
                 agent_management(prompt.lower().replace("-", " ").strip())
                 prompt = None
                 continue
 
             gemini_response, chat_history = get_gemini_response(
-                history=chat_history,
-                new_input=prompt,
-                tools=TOOLS_INFO
+                history=chat_history, new_input=prompt, tools=TOOLS_INFO
             )
 
             # print(f"\nAgent ➤ ")
@@ -173,9 +161,10 @@ def main(prompt=None):
             print(f"\n[!] An error occurred: {err}")
             break
 
+
 if __name__ == "__main__":
     if len(sys.argv) > 1:
-        args = ' '.join(sys.argv[1:])
+        args = " ".join(sys.argv[1:])
         main(args)
     else:
         main()

@@ -36,8 +36,12 @@ def get_available_tools_data():
     Returns a dict of tools names with brief description available for the Gemini model.
     """
     _tools = get_tools_info()
-    tool_data = {tool.__name__: tool.__doc__.strip().split('\n')[0] if tool.__doc__ else "No description available." for tool in _tools}
+    tool_data = {
+        tool.__name__: tool.__doc__.strip().split("\n")[0] if tool.__doc__ else "No description available."
+        for tool in _tools
+    }
     return tool_data
+
 
 if __name__ == "__main__":
     # print(get_tools_info())

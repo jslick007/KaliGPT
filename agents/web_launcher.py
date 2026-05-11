@@ -15,18 +15,20 @@ import argparse
 # --- GLOBAL VARIABLES ---
 JSON_FILE_PATH = os.path.join(os.path.dirname(__file__), "utils", "web_launcher.json")
 
+
 class Colors:
     """ANSI color codes for terminal output."""
-    RESET = '\033[0m'
+
+    RESET = "\033[0m"
 
     # Foreground Colors
-    GREEN = '\033[92m'
-    YELLOW = '\033[93m'
-    CYAN = '\033[96m'
-    RED = '\033[91m'
+    GREEN = "\033[92m"
+    YELLOW = "\033[93m"
+    CYAN = "\033[96m"
+    RED = "\033[91m"
 
     # Styles
-    BOLD = '\033[1m'
+    BOLD = "\033[1m"
 
 
 # -- JSON HANDLING FUNCTIONS --
@@ -42,6 +44,7 @@ def get_json_data():
     except FileNotFoundError as e:
         print(f"\n{Colors.RED}[!] Config File Not found, ", e, Colors.RESET)
         return {}
+
 
 def save_json_data(config):
     """Saves the models configuration to JSON file.
@@ -64,6 +67,7 @@ def get_default_browser_to_use():
     data = get_json_data()
     return data["web-browser"]["default"]
 
+
 def get_default_model():
     """Retrieves the default web model from AI-specific settings.
     Returns:
@@ -72,6 +76,7 @@ def get_default_model():
     data = get_json_data()
     return data["model"]["default"]
 
+
 def get_urls():
     """Retrieves the available web model url's from the JSON configuration.
     Returns:
@@ -79,6 +84,7 @@ def get_urls():
     """
     data = get_json_data()
     return data["model"]["urls"]
+
 
 # -- MAIN FUNCTIONALITY --
 def change_config(change_browser: bool = False, change_model: bool = False):
@@ -89,21 +95,17 @@ def change_config(change_browser: bool = False, change_model: bool = False):
     """
 
     if change_browser:
-        default_browser = int(input(f"""\n{Colors.CYAN}Choose your default web browser:{Colors.RESET}
+        default_browser = int(
+            input(f"""\n{Colors.CYAN}Choose your default web browser:{Colors.RESET}
                 1. chromium
                 2. firefox   [ Default ]
                 3. google chrome
                 4. brave
                 5. safari
 
-                {Colors.CYAN}Enter your choice {Colors.BOLD}(1-5){Colors.RESET}: """).strip())
-        browser_options = {
-            1: "chromium",
-            2: "firefox",
-            3: "google-chrome",
-            4: "brave-browser",
-            5: "safari"
-        }
+                {Colors.CYAN}Enter your choice {Colors.BOLD}(1-5){Colors.RESET}: """).strip()
+        )
+        browser_options = {1: "chromium", 2: "firefox", 3: "google-chrome", 4: "brave-browser", 5: "safari"}
         default_browser = browser_options.get(default_browser, "firefox")
 
         # changing default browser in JSON file
@@ -118,9 +120,11 @@ def change_config(change_browser: bool = False, change_model: bool = False):
         available_models = available_models.replace("chatgpt", "chatgpt [ Default ]")
         available_models += "\n                5. other (to add new model, must have URL)"
 
-        new_model = int(input(f"""\n{Colors.CYAN}Choose your default web model:{Colors.RESET}\n{available_models}
+        new_model = int(
+            input(f"""\n{Colors.CYAN}Choose your default web model:{Colors.RESET}\n{available_models}
 
-                {Colors.CYAN}Enter Your Choice {Colors.BOLD}(1-5){Colors.RESET}: """))
+                {Colors.CYAN}Enter Your Choice {Colors.BOLD}(1-5){Colors.RESET}: """)
+        )
 
         # consolidating model options from models list
         model_options = {}
@@ -152,12 +156,11 @@ def change_config(change_browser: bool = False, change_model: bool = False):
         save_json_data(config)
         print(f"\n{Colors.GREEN}Default Web Model set to: {Colors.BOLD}{new_model} {Colors.RESET}")
 
-
     # Exit after changing configuration
     sys.exit(0)
 
 
-def launch_web_browser(prompt: str, model = None):
+def launch_web_browser(prompt: str, model=None):
     """Launches the specified web browser with a given prompt URL.
     Args:
         prompt (str): The prompt or query to be appended to the URL.
@@ -171,12 +174,14 @@ def launch_web_browser(prompt: str, model = None):
             model_url = model_urls[model]
         else:
             default_model = get_default_model()
-            print(f"\n{Colors.YELLOW}[!] Model '{model}' not found. Using default model '{default_model}'.{Colors.RESET}")
+            print(
+                f"\n{Colors.YELLOW}[!] Model '{model}' not found. Using default model '{default_model}'.{Colors.RESET}"
+            )
             model = default_model
             model_url = model_urls[model]
     else:
-            model = get_default_model()
-            model_url = model_urls.get(model)
+        model = get_default_model()
+        model_url = model_urls.get(model)
 
     try:
         # launching web browser with the constructed URL
@@ -184,7 +189,9 @@ def launch_web_browser(prompt: str, model = None):
         subprocess.run([browser, model_url + prompt], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     except FileNotFoundError:
-        print(f"\n{Colors.RED}[!] Web browser '{browser}' not found. Please check your configuration or install it.{Colors.RESET}")
+        print(
+            f"\n{Colors.RED}[!] Web browser '{browser}' not found. Please check your configuration or install it.{Colors.RESET}"
+        )
     except KeyboardInterrupt:
         print(f"\n{Colors.YELLOW}[!] Exiting, Thanks for utilizing me (^.^).{Colors.RESET}")
     except Exception as e:
@@ -211,9 +218,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         prog="\n     kaligpt --web",
         description="Description: \n     KaliGPT v1.3 AI Web-chat Launcher Agent",
-        formatter_class=argparse.RawDescriptionHelpFormatter
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("-m", "--model", type=str, help="Specify the AI web model to use (e.g., chatgpt, gemini, claude).", default="default")
+    parser.add_argument(
+        "-m",
+        "--model",
+        type=str,
+        help="Specify the AI web model to use (e.g., chatgpt, gemini, claude).",
+        default="default",
+    )
     parser.add_argument("-p", "--prompt", type=str, help="The prompt or query to send to the AI model.", default="")
     parser.add_argument("--change-browser", action="store_true", help="Change the default web browser.")
     parser.add_argument("--change-model", action="store_true", help="Change the default web model.")

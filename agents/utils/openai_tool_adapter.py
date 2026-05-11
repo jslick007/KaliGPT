@@ -26,31 +26,20 @@ def python_type_to_json_schema(annotation):
 
     # Literal values
     if origin is typing.Literal:
-        return {
-            "enum": list(args)
-        }
+        return {"enum": list(args)}
 
     # Enum classes
     if isinstance(annotation, type) and issubclass(annotation, enum.Enum):
-        return {
-            "type": "string",
-            "enum": [e.value for e in annotation]
-        }
+        return {"type": "string", "enum": [e.value for e in annotation]}
 
     # Lists
     if origin in (list, typing.List):
         item_type = args[0] if args else str
-        return {
-            "type": "array",
-            "items": python_type_to_json_schema(item_type)
-        }
+        return {"type": "array", "items": python_type_to_json_schema(item_type)}
 
     # Dicts
     if origin in (dict, typing.Dict):
-        return {
-            "type": "object",
-            "additionalProperties": True
-        }
+        return {"type": "object", "additionalProperties": True}
 
     # Scalars
     if annotation in (str,):
@@ -81,15 +70,7 @@ def openai_tool_adapter(func):
         "type": "function",
         "function": {
             "name": func.__name__,
-            "description": (
-                func.__doc__.strip().split("\n")[0]
-                if func.__doc__
-                else "No description available."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": properties,
-                "required": required
-            }
-        }
+            "description": (func.__doc__.strip().split("\n")[0] if func.__doc__ else "No description available."),
+            "parameters": {"type": "object", "properties": properties, "required": required},
+        },
     }

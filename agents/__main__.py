@@ -10,7 +10,8 @@ import subprocess
 from .utils.agent_configs import ENV_VAR_MAP, get_available_ais, get_default_provider
 from .utils.agent_management import AI_MANAGEMENT_OPTIONS, agent_management
 
-sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 
 # --- Set API key ---
 def set_api_keys():
@@ -45,7 +46,7 @@ def main(args):
 
             command = ["python", "-m", f"agents.{default_model}", prompt]
             # print(f"[+] Launching KaliGPT with default model: {default_model} & prompt: {prompt}")
-            
+
             try:
                 # using python -m agents.agent_module_name to launch the agent
                 # print(f"Running command: {' '.join(command)}")
@@ -55,7 +56,8 @@ def main(args):
                 print(f"Exception occurred: {e}")
 
             except KeyboardInterrupt:
-                print("\n\n")   # MSG already printed by running agent module
+                print("\n\n")  # MSG already printed by running agent module
+
 
 if __name__ == "__main__":
     # print(sys.argv[1:])

@@ -10,8 +10,9 @@ from bs4 import BeautifulSoup
 from subprocess import Popen, PIPE
 
 
-def get_local_server_content(url: str, timeout: int = 5) -> dict[str, bool | None | str] | dict[
-    str, bool | int | str | None]:
+def get_local_server_content(
+    url: str, timeout: int = 5
+) -> dict[str, bool | None | str] | dict[str, bool | int | str | None]:
     """
     Fetch and extract readable text content from a local server webpage.
     Returns structured status instead of raising exceptions.
@@ -29,25 +30,16 @@ def get_local_server_content(url: str, timeout: int = 5) -> dict[str, bool | Non
     """
 
     try:
-        response = requests.get(
-            url,
-            timeout=timeout,
-            headers={"User-Agent": "LocalScraper/1.0"}
-        )
+        response = requests.get(url, timeout=timeout, headers={"User-Agent": "LocalScraper/1.0"})
     except requests.RequestException as exc:
-        return {
-            "success": False,
-            "status_code": None,
-            "error": str(exc),
-            "content": None
-        }
+        return {"success": False, "status_code": None, "error": str(exc), "content": None}
 
     if response.status_code != 200:
         return {
             "success": False,
             "status_code": response.status_code,
             "error": f"HTTP {response.status_code}",
-            "content": None
+            "content": None,
         }
 
     soup = BeautifulSoup(response.content, "html.parser")
@@ -57,23 +49,18 @@ def get_local_server_content(url: str, timeout: int = 5) -> dict[str, bool | Non
 
     text = soup.get_text(separator="\n", strip=True)
 
-    return {
-        "success": True,
-        "status_code": response.status_code,
-        "error": None,
-        "content": text
-    }
+    return {"success": True, "status_code": response.status_code, "error": None, "content": text}
 
 
 def execute_generic_linux_command(command: str) -> dict:
     """
-    Execute a generic Linux command using subprocess module.
+     Execute a generic Linux command using subprocess module.
 
-   Args:
-       command (str): The command to be executed, e.g., "ls -l", "mkdir dir", etc.
+    Args:
+        command (str): The command to be executed, e.g., "ls -l", "mkdir dir", etc.
 
-   Returns:
-        dictionary of response -> {"output": output, "error": error}
+    Returns:
+         dictionary of response -> {"output": output, "error": error}
     """
     try:
         # Split the command into individual arguments

@@ -6,6 +6,7 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 import re
 
+
 def get_console_width():
     """Get the current console width, capped at 160 characters."""
     return min(160, Console().width)
@@ -15,7 +16,7 @@ def print_banner():
     """Prints the HackerX banner"""
 
     console2 = Console(width=get_console_width())
-    banner_text = ("""
+    banner_text = """
         ██╗  ██╗ █████╗  ██████╗██╗  ██╗███████╗██████╗  ██╗  ╔██
         ██║  ██║██╔══██╗██╔════╝██║ ██╔╝██╔════╝██╔══██╗ ╚██  ██╝
         ███████║███████║██║     █████╔╝ █████╗  ██████╔╝   ████
@@ -23,7 +24,7 @@ def print_banner():
         ██║  ██║██║  ██║╚██████╗██║  ██╗███████╗██║  ██║ ██╝  ╚██
         ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝  ═     ═
               HackerX CLI (KaliGPT v1.3) - by SudoHopeX
-    """)
+    """
     console2.print(Panel(banner_text, subtitle="( > HackerX )", border_style="blue", padding=(1, 2)))
 
 
@@ -32,7 +33,7 @@ def parse_n_print_response(api_response_text: str):
     console = Console(width=get_console_width())
 
     # Clean excessive newlines
-    cleaned = re.sub(r'\n\s*\n\s*\n', '\n\n', api_response_text.strip())
+    cleaned = re.sub(r"\n\s*\n\s*\n", "\n\n", api_response_text.strip())
 
     try:
         # Rich's Markdown handles 95% of cases perfectly
@@ -45,7 +46,7 @@ def parse_n_print_response(api_response_text: str):
         pass
 
     # Advanced fallback parser
-    lines = cleaned.split('\n')
+    lines = cleaned.split("\n")
     in_code = False
     code_buffer = []
     lang = "text"
@@ -54,10 +55,10 @@ def parse_n_print_response(api_response_text: str):
         line = line.rstrip()
 
         # Code blocks (ALL languages)
-        if line.strip().startswith('```'):
+        if line.strip().startswith("```"):
             if in_code:
                 # End block
-                code_content = ''.join(code_buffer).strip()
+                code_content = "".join(code_buffer).strip()
                 if code_content:
                     syntax = Syntax(f"\n{code_content}\n", lang, theme="github-dark", line_numbers=True)
                     console.print(syntax)
@@ -69,47 +70,46 @@ def parse_n_print_response(api_response_text: str):
             continue
 
         if in_code:
-            code_buffer.append(line + '\n')
+            code_buffer.append(line + "\n")
             continue
 
         # Headers (H1 - H6)
-        header_match = re.match(r'^(#{1,6})\s+(.+)', line)
+        header_match = re.match(r"^(#{1,6})\s+(.+)", line)
         if header_match:
             level = len(header_match.group(1))
             title = header_match.group(2).strip()
-            colors = ['magenta', 'cyan', 'yellow', 'green', 'blue', 'red']
+            colors = ["magenta", "cyan", "yellow", "green", "blue", "red"]
             color = colors[min(level - 1, 5)]
             console.print(f"[bold {color}] {title}[/bold {color}]")
             continue
 
         # Tables
-        if re.match(r'^\s*\|.*\|$', line):  # Lines starting & ending with | (allowing leading whitespace)
+        if re.match(r"^\s*\|.*\|$", line):  # Lines starting & ending with | (allowing leading whitespace)
             console.print(f"[dim white]{line}[/dim white]")
             continue
 
         # Enhanced inline formatting
-        line = re.sub(r'\*\*(.+?)\*\*', r'[bold white]\1[/bold white]', line)
-        line = re.sub(r'\*(.+?)\*', r'[italic]\1[/italic]', line)
-        line = re.sub(r'`([^`]+)`', r'[bright_blue]\1[/bright_blue]', line)
-        line = re.sub(r'\[(https?://[^\s\]]+)\]\(([^\)]+)\)', r'[underline blue]\2[/underline blue]', line)
+        line = re.sub(r"\*\*(.+?)\*\*", r"[bold white]\1[/bold white]", line)
+        line = re.sub(r"\*(.+?)\*", r"[italic]\1[/italic]", line)
+        line = re.sub(r"`([^`]+)`", r"[bright_blue]\1[/bright_blue]", line)
+        line = re.sub(r"\[(https?://[^\s\]]+)\]\(([^\)]+)\)", r"[underline blue]\2[/underline blue]", line)
 
         # Lists (unlimited numbers)
-        if re.match(r'^\s*[-\*+•]\s', line):
-            line = re.sub(r'^\s*[-\*+•]\s', '[yellow]•[/yellow] ', line)
-        elif re.match(r'^\s*\d+\.', line):
-            line = re.sub(r'^\s*(\d+)\.\s', r'[cyan]\1.[/cyan] ', line)
+        if re.match(r"^\s*[-\*+•]\s", line):
+            line = re.sub(r"^\s*[-\*+•]\s", "[yellow]•[/yellow] ", line)
+        elif re.match(r"^\s*\d+\.", line):
+            line = re.sub(r"^\s*(\d+)\.\s", r"[cyan]\1.[/cyan] ", line)
 
         console.print(line)
 
         # Handle final code block if exists
         if in_code and code_buffer:
-            code_content = ''.join(code_buffer).strip()
+            code_content = "".join(code_buffer).strip()
             if code_content:
                 syntax = Syntax(f"\n{code_content}\n", lang, theme="github-dark", line_numbers=True)
                 console.print(syntax)
 
     return True
-
 
 
 # Usage example (optional)

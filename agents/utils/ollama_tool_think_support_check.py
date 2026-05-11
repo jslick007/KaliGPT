@@ -13,6 +13,7 @@ MODEL: str
 client: Client
 SUPPORT_STAGE: int
 
+
 def addition():
     pass
 
@@ -40,7 +41,7 @@ def check_think_support():
         return False
 
 
-def model_support_check(model, api_url = get_api_key("ollama")):
+def model_support_check(model, api_url=get_api_key("ollama")):
     global client, MODEL, SUPPORT_STAGE
     client = Client(host=api_url)
     MODEL = model
@@ -59,6 +60,12 @@ def model_support_check(model, api_url = get_api_key("ollama")):
 
     return SUPPORT_STAGE
 
+
 if __name__ == "__main__":
-    print(model_support_check("gpt-oss:120b-cloud", "http://localhost:11434", ))
+    print(
+        model_support_check(
+            "gpt-oss:120b-cloud",
+            "http://localhost:11434",
+        )
+    )
     print(check_tool_support())

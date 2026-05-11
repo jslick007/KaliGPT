@@ -18,12 +18,11 @@ import sys
 import requests
 
 
-
 # --- GLOBAL VARIABLES ---
 DEFAULT_AI_MODEL: str
 SELECTED_VENDOR: str
 SELECTED_MODEL: str
-ALL_AI_PROVIDERS = ["gemini", "chatgpt", "ollama","openrouter"]  # FETCHED LATER FOR UPDATED LIST
+ALL_AI_PROVIDERS = ["gemini", "chatgpt", "ollama", "openrouter"]  # FETCHED LATER FOR UPDATED LIST
 AI_MANAGEMENT_OPTIONS = ["/change model", "/reset to default model", "/list tools", "/help", "/exit", "/quit", "/bye"]
 console = Console(width=get_console_width())
 
@@ -31,16 +30,17 @@ console = Console(width=get_console_width())
 # --- COLOR CLASS ---
 class Colors:
     """ANSI color codes for terminal output."""
-    RESET = '\033[0m'
+
+    RESET = "\033[0m"
 
     # Foreground Colors
-    GREEN = '\033[92m'
-    YELLOW = '\033[93m'
-    CYAN = '\033[96m'
-    RED = '\033[91m'
+    GREEN = "\033[92m"
+    YELLOW = "\033[93m"
+    CYAN = "\033[96m"
+    RED = "\033[91m"
 
     # Styles
-    BOLD = '\033[1m'
+    BOLD = "\033[1m"
 
 
 def interactive_select(title, text, options):
@@ -56,13 +56,10 @@ def interactive_select(title, text, options):
     label -> shown in UI
     """
 
-    result = radiolist_dialog(
-        title=title,
-        text=text,
-        values=options
-    ).run()
+    result = radiolist_dialog(title=title, text=text, values=options).run()
 
     return result
+
 
 def fetch_ollama_local_models():
     """
@@ -79,6 +76,7 @@ def fetch_ollama_local_models():
     except:
         return []
 
+
 # get vendor name from number selected by user via mapping
 def set_vendor_name():
     global SELECTED_VENDOR, ALL_AI_PROVIDERS
@@ -87,7 +85,7 @@ def set_vendor_name():
     selected = interactive_select(
         title="HackerX Vendor Selection",
         text="Usages: Use Arrow keys then ENTER to select model, TAB to switch..",
-        options=options
+        options=options,
     )
 
     if not selected:
@@ -105,9 +103,7 @@ def set_vendor_name():
 def set_default_model():
     global SELECTED_MODEL
 
-    vendor_specific_all_models = list(
-        get_vendor_specific_all_models(SELECTED_VENDOR)
-    )
+    vendor_specific_all_models = list(get_vendor_specific_all_models(SELECTED_VENDOR))
 
     if SELECTED_VENDOR.lower() == "ollama":
         ollama_models = fetch_ollama_local_models()
@@ -127,7 +123,7 @@ def set_default_model():
     selected = interactive_select(
         title=f"{SELECTED_VENDOR} Model Selection",
         text="Usages: Use Arrow keys then ENTER to select model, TAB to switch..",
-        options=options
+        options=options,
     )
 
     if not selected:
@@ -135,10 +131,7 @@ def set_default_model():
         return False
 
     if selected == "Other (Add new)":
-
-        custom_model = input(
-            f"{Colors.CYAN}Enter Model Name > {Colors.RESET}"
-        ).strip()
+        custom_model = input(f"{Colors.CYAN}Enter Model Name > {Colors.RESET}").strip()
 
         if not custom_model:
             print(f"{Colors.RED}Invalid model{Colors.RESET}")
@@ -156,10 +149,7 @@ def set_default_model():
     )
 
     if updated:
-        print(
-            f"\n{Colors.GREEN}Model changed -> "
-            f"{Colors.BOLD}{SELECTED_VENDOR}/{SELECTED_MODEL}{Colors.RESET}"
-        )
+        print(f"\n{Colors.GREEN}Model changed -> {Colors.BOLD}{SELECTED_VENDOR}/{SELECTED_MODEL}{Colors.RESET}")
         return True
 
     print(f"{Colors.RED}Failed to update model{Colors.RESET}")
@@ -183,8 +173,9 @@ def change_ai_model():
     if not updated and attempt >= 3:
         print("Model Change failed. Try Again ( 3 attempts consumed )...")
 
+
 def reset_ai_model_to_default():
-    """Setting AI Model to default model - 'gemini-2.5-flash' """
+    """Setting AI Model to default model - 'gemini-2.5-flash'"""
 
     global DEFAULT_AI_MODEL
     DEFAULT_AI_MODEL = get_default_model()
@@ -196,7 +187,9 @@ def reset_ai_model_to_default():
     for attempt in range(max_attempts):
         if update_default_model(DEFAULT_AI_MODEL) and update_default_provider("gemini"):
             data += f"\n{Colors.GREEN} [✓] Reset Success :{Colors.RESET} Default AI Model Now » {Colors.BOLD}{DEFAULT_AI_MODEL}{Colors.RESET}"
-            console.print(Panel(data, title="( HackerX - Reset to Default Model )", border_style="blue", padding=(1, 2)))
+            console.print(
+                Panel(data, title="( HackerX - Reset to Default Model )", border_style="blue", padding=(1, 2))
+            )
             break
 
         if attempt == max_attempts - 1:
@@ -210,19 +203,14 @@ def print_all_available_tools():
     for name, desc in tools.items():
         table.add_row(f"   ◈ {Colors.YELLOW}{name}{Colors.RESET} :", desc)
 
-    console.print(
-        Panel(
-            table,
-            title="( HackerX - Available Tools )",
-            border_style="blue",
-            padding=(1, 2)
-        )
-    )
+    console.print(Panel(table, title="( HackerX - Available Tools )", border_style="blue", padding=(1, 2)))
 
 
 def print_agent_management_options():
 
-    table1 = Table(title="Model Management Commands", title_style="cyan", title_justify="left", show_header=False, box=None)
+    table1 = Table(
+        title="Model Management Commands", title_style="cyan", title_justify="left", show_header=False, box=None
+    )
     table1.add_row(f"{Colors.YELLOW}/change model{Colors.RESET}", "Change default AI model")
     table1.add_row(f"{Colors.YELLOW}/reset to default model{Colors.RESET}", "Reset to built-in model")
     table1.add_row("", "")
@@ -240,26 +228,29 @@ def print_agent_management_options():
             border_style="blue",
             padding=(1, 2),
             subtitle="[ Use these commands while in 'Interaction Mode' with agents! ]",
-        ))
+        )
+    )
+
 
 def agent_management_options():
     print_agent_management_options()
     options = [
-        ("/change model",           "/change model            →  Change default AI model"),
+        ("/change model", "/change model            →  Change default AI model"),
         ("/reset to default model", "/reset to default model  →  Reset to built-in model"),
-        ("/list tools",             "/list tools              →  List all available tools"),
-        ("/help",                   "/help                    →  Show help menu"),
-        ("/exit",                   "/exit                    →  Exit HackerX")
+        ("/list tools", "/list tools              →  List all available tools"),
+        ("/help", "/help                    →  Show help menu"),
+        ("/exit", "/exit                    →  Exit HackerX"),
     ]
 
     selected = interactive_select(
         title="HackerX Help Menu",
         text="Usages: Use Arrow keys then ENTER to select model, TAB to switch..",
-        options=options
+        options=options,
     )
 
     if selected:
         agent_management(selected)
+
 
 def agent_management(task):
     match task:
@@ -270,7 +261,6 @@ def agent_management(task):
         # reset model to built-in default model
         case "/reset to default model":
             reset_ai_model_to_default()
-
 
         # list all available tools
         case "/list tools":
@@ -286,8 +276,9 @@ def agent_management(task):
         case _:
             print("Unknown command")
 
+
 if __name__ == "__main__":
     # print(agent_management('/change model'))
     # print(agent_management('/reset model'))
     # print(agent_management('/list tools'))
-    print(agent_management('/help'))
+    print(agent_management("/help"))

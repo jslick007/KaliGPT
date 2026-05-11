@@ -17,7 +17,7 @@ from .utils.parse_n_print_response import parse_n_print_response
 from .utils.tools import get_tools_info
 from .utils.openai_tool_adapter import openai_tool_adapter
 from .utils.prompts import WEB_BUG_BOUNTY_AGENT as SYSTEM_PROMPT
-from .utils.debug_logger import log_llm_request, log_llm_response
+from .utils.retry import retry_stream
 
 # ----- Global Variables
 OPENROUTER_API_KEY: str
@@ -26,49 +26,51 @@ TOOLS_INFO = None
 TOOL_FUNCTION_MAP: dict
 client: OpenAI
 
+
 def initialize_agent():
-  """Initializes the Tool configs (stored in global variables) like:
-        - API KEY
-        - AI Model to use for calls
-        - Tools information
-  """
+    """Initializes the Tool configs (stored in global variables) like:
+    - API KEY
+    - AI Model to use for calls
+    - Tools information
+    """
 
-  global OPENROUTER_API_KEY, OPENROUTER_MODEL, TOOLS_INFO, TOOL_FUNCTION_MAP, client
-  try:
-    OPENROUTER_API_KEY = get_api_key("openrouter")
-    OPENROUTER_MODEL = get_ai_specific_default_model("openrouter")
+    global OPENROUTER_API_KEY, OPENROUTER_MODEL, TOOLS_INFO, TOOL_FUNCTION_MAP, client
+    try:
+        OPENROUTER_API_KEY = get_api_key("openrouter")
+        OPENROUTER_MODEL = get_ai_specific_default_model("openrouter")
 
-    if not OPENROUTER_API_KEY or 'sk-or-v1-' not in OPENROUTER_API_KEY:
-      print("[!] OPENROUTER API Key not Found or not valid. exiting!")
-      sys.exit(0)
+        if not OPENROUTER_API_KEY or "sk-or-v1-" not in OPENROUTER_API_KEY:
+            print("[!] OPENROUTER API Key not Found or not valid. exiting!")
+            sys.exit(0)
 
-    tools = get_tools_info()
-    TOOLS_INFO = [openai_tool_adapter(f) for f in tools]
+        tools = get_tools_info()
+        TOOLS_INFO = [openai_tool_adapter(f) for f in tools]
 
-    # --- TOOL EXECUTION HELPER (Your Original Function) ---
-    TOOL_FUNCTION_MAP = {func.__name__: func for func in tools} if tools else {}
+        # --- TOOL EXECUTION HELPER (Your Original Function) ---
+        TOOL_FUNCTION_MAP = {func.__name__: func for func in tools} if tools else {}
 
-    if not TOOLS_INFO:
-      print("[!] No external tools loaded.")
+        if not TOOLS_INFO:
+            print("[!] No external tools loaded.")
 
-    client = OpenAI(
-      base_url="https://openrouter.ai/api/v1",
-      api_key=OPENROUTER_API_KEY,
-    )
+        client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=OPENROUTER_API_KEY,
+        )
 
-  except Exception as e:
-    print(f"Failed to initialize Agent: {e}")
-    sys.exit(1)
+    except Exception as e:
+        print(f"Failed to initialize Agent: {e}")
+        sys.exit(1)
 
 
 MAX_TURNS = 6
 MAX_TOOL_CALLS = 10
 
+
 def trim_history(history):
-    """ Trim chat history to keep within MAX_TURNS """
+    """Trim chat history to keep within MAX_TURNS"""
     system = [m for m in history if m["role"] == "system"]
     rest = [m for m in history if m["role"] != "system"]
-    return system + rest[-MAX_TURNS * 2:]
+    return system + rest[-MAX_TURNS * 2 :]
 
 
 def execute_tool_calls(tool_calls):
@@ -96,12 +98,7 @@ def execute_tool_calls(tool_calls):
                 result = f"Tool execution error: {e}"
 
         # Correct OpenAI/OpenRouter Tool Message format
-        tool_messages.append({
-            "role": "tool",
-            "tool_call_id": call_id,
-            "name": func_name,
-            "content": str(result)
-        })
+        tool_messages.append({"role": "tool", "tool_call_id": call_id, "name": func_name, "content": str(result)})
 
     return tool_messages
 
@@ -111,11 +108,13 @@ def _stream_completion(messages, tools):
     full_text = ""
     tool_calls_acc = {}
 
-    stream = client.chat.completions.create(
-        model=OPENROUTER_MODEL,
-        messages=messages,
-        tools=tools or [],
-        stream=True,
+    stream = retry_stream(
+        lambda: client.chat.completions.create(
+            model=OPENROUTER_MODEL,
+            messages=messages,
+            tools=tools or [],
+            stream=True,
+        )
     )
 
     for chunk in stream:
@@ -145,7 +144,6 @@ def ask(prompt, chat_history, tools=TOOLS_INFO):
     tool_call_count = 0
 
     try:
-        log_llm_request("OpenRouter", messages)
         full_text, tool_calls_acc = _stream_completion(messages, tools)
 
         while tool_calls_acc and tool_call_count < MAX_TOOL_CALLS:
@@ -159,22 +157,20 @@ def ask(prompt, chat_history, tools=TOOLS_INFO):
             messages.append(assistant_msg)
 
             tool_results = execute_tool_calls(
-                [SimpleNamespace(
-                    id=tc["id"],
-                    function=SimpleNamespace(
-                        name=tc["function"]["name"],
-                        arguments=tc["function"]["arguments"]
+                [
+                    SimpleNamespace(
+                        id=tc["id"],
+                        function=SimpleNamespace(name=tc["function"]["name"], arguments=tc["function"]["arguments"]),
                     )
-                ) for tc in tool_calls_list]
+                    for tc in tool_calls_list
+                ]
             )
             messages.extend(tool_results)
 
-            log_llm_request("OpenRouter (tool follow-up)", messages)
             full_text, tool_calls_acc = _stream_completion(messages, tools)
 
         chat_history.append({"role": "user", "content": prompt})
         chat_history.append({"role": "assistant", "content": full_text})
-        log_llm_response("OpenRouter", full_text)
         return full_text, chat_history
 
     except Exception as e:
@@ -189,48 +185,44 @@ def ask(prompt, chat_history, tools=TOOLS_INFO):
 
 
 def main(prompt=None):
-  sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-  initialize_agent()
+    initialize_agent()
 
-  # Initialize chat history with system prompt
-  chat_history: list = [{"role": "system", "content": SYSTEM_PROMPT}]
+    # Initialize chat history with system prompt
+    chat_history: list = [{"role": "system", "content": SYSTEM_PROMPT}]
 
-  print(f"> HackerX ( openrouter/{OPENROUTER_MODEL} )")
+    print(f"> HackerX ( openrouter/{OPENROUTER_MODEL} )")
 
-  while True:
-    try:
-      if prompt is None:
-        prompt = input("\nYou > ")
+    while True:
+        try:
+            if prompt is None:
+                prompt = input("\nYou > ")
 
-      if prompt.lower().replace("-", " ").strip() in AI_MANAGEMENT_OPTIONS:
-        agent_management(prompt.lower().replace("-", " ").strip())
-        initialize_agent()
-        prompt = None
-        continue
+            if prompt.lower().replace("-", " ").strip() in AI_MANAGEMENT_OPTIONS:
+                agent_management(prompt.lower().replace("-", " ").strip())
+                initialize_agent()
+                prompt = None
+                continue
 
-      response, chat_history = ask(
-        chat_history=chat_history,
-        prompt=prompt,
-        tools=TOOLS_INFO
-      )
+            response, chat_history = ask(chat_history=chat_history, prompt=prompt, tools=TOOLS_INFO)
 
-      # print(f"\nAgent ➤ ")
-      parse_n_print_response(response)
-      prompt = None
+            # print(f"\nAgent ➤ ")
+            parse_n_print_response(response)
+            prompt = None
 
-    except KeyboardInterrupt:
-      print("\n   Exiting HackerX. See you later!")
-      break
+        except KeyboardInterrupt:
+            print("\n   Exiting HackerX. See you later!")
+            break
 
-    except Exception as err:
-      print(f"\n   [!] An error occurred: {err}")
-      break
+        except Exception as err:
+            print(f"\n   [!] An error occurred: {err}")
+            break
 
 
 if __name__ == "__main__":
-  if len(sys.argv) > 1:
-    args = ' '.join(sys.argv[1:])
-    main(args)
-  else:
-    main()
+    if len(sys.argv) > 1:
+        args = " ".join(sys.argv[1:])
+        main(args)
+    else:
+        main()

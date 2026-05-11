@@ -28,6 +28,7 @@ ENV_VAR_DEFAULTS: Dict[str, str] = {
 
 # --- CENTRAL CONFIG FILE MANAGEMENT ---
 
+
 def _load_config() -> Dict[str, Any]:
     """Reads JSON config. Creates a new file with default data if missing or corrupted."""
 
@@ -36,22 +37,11 @@ def _load_config() -> Dict[str, Any]:
         "default_provider": "ollama",
         "gemini": {
             "default_model": "gemini-2.5-flash",
-            "models": ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-1.5-flash-latest"]
+            "models": ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-1.5-flash-latest"],
         },
-        "chatgpt": {
-            "default_model": "gpt-4o",
-            "models": ["gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"]
-        },
-        "ollama": {
-            "default_model": "llama3",
-            "models": ["llama3", "mistral", "qwen3:8b"]
-        },
-        "openrouter": {
-            "default_model": "z-ai/glm-4.5-air:free",
-            "models": [
-                "z-ai/glm-4.5-air:free"
-            ]
-        }
+        "chatgpt": {"default_model": "gpt-4o", "models": ["gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"]},
+        "ollama": {"default_model": "llama3", "models": ["llama3", "mistral", "qwen3:8b"]},
+        "openrouter": {"default_model": "z-ai/glm-4.5-air:free", "models": ["z-ai/glm-4.5-air:free"]},
     }
 
     try:
@@ -87,17 +77,20 @@ def _save_config(data: Dict[str, Any]) -> bool:
 
 # --- CONFIGURATION ACCESS AND UPDATE FUNCTIONS ---
 
+
 # Function 1: Read and return the global default AI model
 def get_default_model() -> str:
     """Returns the globally configured default AI model string."""
     data = _load_config()
-    return data.get('default_model', "gemini-2.5-flash")  # Fallback for safety
+    return data.get("default_model", "gemini-2.5-flash")  # Fallback for safety
+
 
 def get_default_provider():
     """Returns the AI provider associated with the global default model."""
     data = _load_config()
-    default_provider = data.get('default_provider', 'gemini')  # Fallback to gemini for safety
+    default_provider = data.get("default_provider", "gemini")  # Fallback to gemini for safety
     return default_provider
+
 
 # Function 2: Update the global default AI model
 def update_default_model(new_model: str) -> bool:
@@ -106,18 +99,20 @@ def update_default_model(new_model: str) -> bool:
     data["default_model"] = new_model
     return _save_config(data)
 
+
 def update_default_provider(new_provider: str) -> bool:
     """Updates the globally configured default AI provider."""
     data = _load_config()
     data["default_provider"] = new_provider
     return _save_config(data)
 
+
 # Function 3: Read and return all available AI Vendors
 def get_available_ais() -> List[str]:
     """Returns a list of all configured AI provider vendors (e.g., 'gemini', 'chatgpt')."""
     data = _load_config()
     # FIX: Use a list comprehension to exclude the 'default_model' & 'default_provider' key correctly
-    return [k for k in data.keys() if k != 'default_model' and k!='default_provider']
+    return [k for k in data.keys() if k != "default_model" and k != "default_provider"]
 
 
 # Function 4: Read and return API key of a specific AI from environment variable
@@ -172,14 +167,12 @@ def update_ai_specific_default_model(ai_name: str, new_model: str) -> bool:
 
 # --- ADDITIONAL UTILITIES (From your original list) ---
 
+
 def add_ai_provider(ai_name: str, default_model: str, models: List[str]) -> bool:
     """Adds a new AI provider to the configuration file.
     Note: API keys are set via environment variables, not stored in config."""
     data = _load_config()
-    data[ai_name] = {
-        "default_model": default_model,
-        "models": models
-    }
+    data[ai_name] = {"default_model": default_model, "models": models}
     return _save_config(data)
 
 

@@ -12,7 +12,9 @@ import argparse
 
 # Define the working directory where openserp is located
 linux_working_directory = os.path.join(os.path.dirname(__file__), "/opt", "KaliGPT", "openserp")
-termux_working_directory = os.path.join(os.path.dirname(__file__), "/data", "data", "com.termux", "files", "usr", "share", "KaliGPT", "openserp")
+termux_working_directory = os.path.join(
+    os.path.dirname(__file__), "/data", "data", "com.termux", "files", "usr", "share", "KaliGPT", "openserp"
+)
 
 
 def start_openserp_service(working_directory=linux_working_directory) -> str:
@@ -46,7 +48,7 @@ def stop_openserp_service(openserp_pid: str):
         int: 0 (True) if the service was stopped successfully, 1 (False) otherwise.
     """
 
-    if openserp_pid :
+    if openserp_pid:
         try:
             # Terminate the OpenSerp service
             subprocess.run(["kill", openserp_pid])
@@ -55,12 +57,11 @@ def stop_openserp_service(openserp_pid: str):
 
         except Exception:
             # print(f"Failed to stop OpenSerp service: {e}")
-            return 1 # False
+            return 1  # False
 
     else:
         # print("OpenSerp service is not running.")
         return 1
-
 
 
 def main(options):

@@ -16,11 +16,11 @@ from .utils.tools import get_tools_info
 from .utils.agent_management import AI_MANAGEMENT_OPTIONS, agent_management
 from .utils.openai_tool_adapter import openai_tool_adapter
 from .utils.ollama_tool_think_support_check import model_support_check
-from .utils.debug_logger import log_llm_request, log_llm_response
+from .utils.retry import retry_stream
 
 
 # --- GLOBAL VARIABLES ---
-OLLAMA_API_URL: str   # OLLAMA API URL as OLLAMA_API_KEY
+OLLAMA_API_URL: str  # OLLAMA API URL as OLLAMA_API_KEY
 OLLAMA_MODEL: str
 TOOLS_INFO: list
 TOOL_FUNCTION_MAP: dict
@@ -58,7 +58,6 @@ def initialize_configs():
         # --- TOOL EXECUTION HELPER (Your Original Function) ---
         TOOL_FUNCTION_MAP = {func.__name__: func for func in tools} if tools else {}
 
-
     except Exception as e:
         print(f"Failed to initialize Ollama Agent: {e}\n[!] OLLAMA_API_URL may be misconfigured or unreachable.")
         sys.exit(1)
@@ -67,11 +66,12 @@ def initialize_configs():
 MAX_TURNS = 6
 MAX_TOOL_CALLS = 10
 
+
 def trim_history(history):
-    """ Trim chat history to keep within MAX_TURNS """
+    """Trim chat history to keep within MAX_TURNS"""
     system = [m for m in history if m["role"] == "system"]
     rest = [m for m in history if m["role"] != "system"]
-    return system + rest[-MAX_TURNS * 2:]
+    return system + rest[-MAX_TURNS * 2 :]
 
 
 def execute_function_calls(function_calls):
@@ -91,10 +91,7 @@ def execute_function_calls(function_calls):
         else:
             result_text = f"Tool {func_name} not found!"
 
-        response_parts.append({
-                "name": func_name,
-                "result": str(result_text)
-            })
+        response_parts.append({"name": func_name, "result": str(result_text)})
 
     return response_parts
 
@@ -118,8 +115,7 @@ def ask(user_input, history, tools):
 
     while True:
         try:
-            log_llm_request("Ollama", messages)
-            stream = request_resp(messages=messages, tools=tools)
+            stream = retry_stream(lambda: request_resp(messages=messages, tools=tools))
 
             tool_calls = []
             full_content = ""
@@ -132,19 +128,12 @@ def ask(user_input, history, tools):
                     tool_calls = chunk.message.tool_calls
             print()
 
-            messages.append({
-                "role": "assistant",
-                "content": full_content,
-                "tool_calls": tool_calls
-            })
+            messages.append({"role": "assistant", "content": full_content, "tool_calls": tool_calls})
 
             if tool_calls and tool_call_count < MAX_TOOL_CALLS:
                 tool_call_count += 1
                 tool_results = execute_function_calls(tool_calls)
-                messages.append({
-                    "role": "tool",
-                    "content": str(tool_results)
-                })
+                messages.append({"role": "tool", "content": str(tool_results)})
             else:
                 break
 
@@ -152,17 +141,16 @@ def ask(user_input, history, tools):
             print(f"[!] Error: {e}")
             sys.exit(1)
 
-    log_llm_response("Ollama", full_content)
     return full_content, messages
 
 
 def main(prompt=None):
-    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
     # Initialize chat history with system prompt
     chat_history: list = [{"role": "system", "content": SYSTEM_PROMPT}]
 
-    initialize_configs()   # initialize configs for Ollama
+    initialize_configs()  # initialize configs for Ollama
 
     # Print tool banner
     print(f"> HackerX ( ollama/{OLLAMA_MODEL} )")
@@ -177,11 +165,7 @@ def main(prompt=None):
                 prompt = None
                 continue
 
-            response, chat_history = ask(
-                history=chat_history,
-                user_input=prompt,
-                tools=TOOLS_INFO
-            )
+            response, chat_history = ask(history=chat_history, user_input=prompt, tools=TOOLS_INFO)
 
             parse_n_print_response(response)
             prompt = None
@@ -194,10 +178,10 @@ def main(prompt=None):
             print(f"\n[!] An error occurred: {err}")
             break
 
-if __name__ == "__main__":
 
+if __name__ == "__main__":
     if len(sys.argv) > 1:
-        args = ' '.join(sys.argv[1:])
+        args = " ".join(sys.argv[1:])
         main(args)
     else:
         main()
