@@ -11,7 +11,7 @@ import json
 from types import SimpleNamespace
 from openai import OpenAI
 
-from .utils.agent_configs import get_api_key, get_ai_specific_default_model
+from .utils.agent_configs import get_api_key, get_ai_specific_default_model, get_vendor_specific_all_models
 from .utils.agent_management import AI_MANAGEMENT_OPTIONS, agent_management
 from .utils.tools import get_tools_info
 from .utils.openai_tool_adapter import openai_tool_adapter
@@ -24,6 +24,17 @@ OPENROUTER_MODEL: str
 TOOLS_INFO = None
 TOOL_FUNCTION_MAP: dict
 client: OpenAI
+OPENROUTER_MODELS: list = []
+MODEL_INDEX: int = 0
+
+
+def cycle_openrouter_model():
+    global OPENROUTER_MODEL, MODEL_INDEX
+    if not OPENROUTER_MODELS:
+        return
+    MODEL_INDEX = (MODEL_INDEX + 1) % len(OPENROUTER_MODELS)
+    OPENROUTER_MODEL = OPENROUTER_MODELS[MODEL_INDEX]
+    print(f"[!] Switching to fallback model: {OPENROUTER_MODEL}")
 
 
 def initialize_agent():
@@ -32,13 +43,20 @@ def initialize_agent():
     - AI Model to use for calls
     - Tools information
     """
-
-    global OPENROUTER_API_KEY, OPENROUTER_MODEL, TOOLS_INFO, TOOL_FUNCTION_MAP, client
+ 
+    global OPENROUTER_API_KEY, OPENROUTER_MODEL, TOOLS_INFO, TOOL_FUNCTION_MAP, client, OPENROUTER_MODELS, MODEL_INDEX
     try:
         OPENROUTER_API_KEY = get_api_key("openrouter")
         OPENROUTER_MODEL = get_ai_specific_default_model("openrouter")
+        OPENROUTER_MODELS = get_vendor_specific_all_models("openrouter")
+        
+        if OPENROUTER_MODELS and OPENROUTER_MODEL in OPENROUTER_MODELS:
+            MODEL_INDEX = OPENROUTER_MODELS.index(OPENROUTER_MODEL)
+        else:
+            MODEL_INDEX = 0
 
         if not OPENROUTER_API_KEY or "sk-or-v1-" not in OPENROUTER_API_KEY:
+
             print("[!] OPENROUTER API Key not Found or not valid. exiting!")
             sys.exit(0)
 
@@ -113,7 +131,8 @@ def _stream_completion(messages, tools):
             messages=messages,
             tools=tools or [],
             stream=True,
-        )
+        ),
+        on_retry=cycle_openrouter_model
     )
 
     for chunk in stream:

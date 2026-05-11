@@ -37,10 +37,16 @@ def cycle_openai_model():
 
 
 def initialize_configs():
-    global OPENAI_API_KEY, OPENAI_MODEL, client, TOOLS_INFO, TOOL_FUNCTION_MAP
+    global OPENAI_API_KEY, OPENAI_MODEL, client, TOOLS_INFO, TOOL_FUNCTION_MAP, OPENAI_MODELS, MODEL_INDEX
     try:
         OPENAI_API_KEY = get_api_key("chatgpt")
         OPENAI_MODEL = get_ai_specific_default_model("chatgpt")
+        OPENAI_MODELS = get_vendor_specific_all_models("chatgpt")
+        
+        if OPENAI_MODELS and OPENAI_MODEL in OPENAI_MODELS:
+            MODEL_INDEX = OPENAI_MODELS.index(OPENAI_MODEL)
+        else:
+            MODEL_INDEX = 0
 
         if not OPENAI_API_KEY or "sk-" not in OPENAI_API_KEY:
             print("[!] ChatGPT API Key not Found or not valid. exiting!")
@@ -84,7 +90,8 @@ def get_chatgpt_response(history: list, new_input: str, tools, tool_call_count=0
             messages=messages,
             tools=tools,
             stream=True,
-        )
+        ),
+        on_retry=cycle_openai_model
     )
 
     full_text = ""

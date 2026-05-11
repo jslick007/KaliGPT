@@ -10,7 +10,7 @@ import sys
 from ollama import Client
 
 from .utils.prompts import WEB_BUG_BOUNTY_AGENT as SYSTEM_PROMPT
-from .utils.agent_configs import get_ai_specific_default_model, get_api_key
+from .utils.agent_configs import get_ai_specific_default_model, get_api_key, get_vendor_specific_all_models
 from .utils.tools import get_tools_info
 from .utils.agent_management import AI_MANAGEMENT_OPTIONS, agent_management
 from .utils.openai_tool_adapter import openai_tool_adapter
@@ -25,12 +25,28 @@ TOOLS_INFO: list
 TOOL_FUNCTION_MAP: dict
 client: Client
 SUPPORT_STAGE: int
+OLLAMA_MODELS: list = []
+MODEL_INDEX: int = 0
+
+
+def cycle_ollama_model():
+    global OLLAMA_MODEL, MODEL_INDEX
+    if not OLLAMA_MODELS:
+        return
+    MODEL_INDEX = (MODEL_INDEX + 1) % len(OLLAMA_MODELS)
+    OLLAMA_MODEL = OLLAMA_MODELS[MODEL_INDEX]
+    print(f"[!] Switching to fallback model: {OLLAMA_MODEL}")
 
 
 def initialize_agent():
-    global SUPPORT_STAGE, OLLAMA_API_URL
-    global OLLAMA_MODEL
+    global SUPPORT_STAGE, OLLAMA_API_URL, OLLAMA_MODEL, OLLAMA_MODELS, MODEL_INDEX
     OLLAMA_MODEL = get_ai_specific_default_model("ollama")
+    OLLAMA_MODELS = get_vendor_specific_all_models("ollama")
+    
+    if OLLAMA_MODELS and OLLAMA_MODEL in OLLAMA_MODELS:
+        MODEL_INDEX = OLLAMA_MODELS.index(OLLAMA_MODEL)
+    else:
+        MODEL_INDEX = 0
 
     # Check Models for Tools & thinking support and specify SUPPORT_STAGE based on that
     OLLAMA_API_URL = get_api_key("ollama")
