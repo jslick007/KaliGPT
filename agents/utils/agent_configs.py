@@ -1,13 +1,29 @@
-# use JSON to store and retrieve api_keys, api_models and more
-# Updated: 20 March 2026
+# use JSON to store and retrieve api_models and more
+# API keys are read from environment variables only
+# Updated: 11 May 2026
 
 
 import json
+import os
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
 # --- CONFIG FILE PATH (Relative to this module's directory) ---
 CONFIG_FILE = Path(__file__).resolve().parent / "api.config.json"
+
+
+# --- ENVIRONMENT VARIABLE MAPPING ---
+# API keys are read exclusively from these environment variables
+ENV_VAR_MAP: Dict[str, str] = {
+    "gemini": "GEMINI_API_KEY",
+    "chatgpt": "OPENAI_API_KEY",
+    "ollama": "OLLAMA_HOST",
+    "openrouter": "OPENROUTER_API_KEY",
+}
+
+ENV_VAR_DEFAULTS: Dict[str, str] = {
+    "ollama": "http://localhost:11434",
+}
 
 
 # --- CENTRAL CONFIG FILE MANAGEMENT ---
@@ -19,22 +35,18 @@ def _load_config() -> Dict[str, Any]:
         "default_model": "gemini-2.5-flash",
         "default_provider": "ollama",
         "gemini": {
-            "api_key": "GEMINI_API_KEY",
             "default_model": "gemini-2.5-flash",
             "models": ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-1.5-flash-latest"]
         },
         "chatgpt": {
-            "api_key": "OPENAI_API_KEY",
             "default_model": "gpt-4o",
             "models": ["gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"]
         },
         "ollama": {
-            "api_key": "http://localhost:11434",  # URL for Ollama
             "default_model": "llama3",
             "models": ["llama3", "mistral", "qwen3:8b"]
         },
         "openrouter": {
-            "api_key": "OpenRouter_API_Key",
             "default_model": "z-ai/glm-4.5-air:free",
             "models": [
                 "z-ai/glm-4.5-air:free"
@@ -108,11 +120,16 @@ def get_available_ais() -> List[str]:
     return [k for k in data.keys() if k != 'default_model' and k!='default_provider']
 
 
-# Function 4: Read and return API key of a specific AI
+# Function 4: Read and return API key of a specific AI from environment variable
 def get_api_key(ai_name: str) -> Optional[str]:
-    """Returns the API key for the specified AI vendor."""
-    data = _load_config()
-    return data.get(ai_name, {}).get("api_key")
+    """Returns the API key for the specified AI vendor from environment variables."""
+    env_var = ENV_VAR_MAP.get(ai_name)
+    if not env_var:
+        return None
+    value = os.environ.get(env_var)
+    if value:
+        return value
+    return ENV_VAR_DEFAULTS.get(ai_name)
 
 
 # Function 5: Read and return default model of a specific AI
@@ -129,14 +146,18 @@ def get_vendor_specific_all_models(ai_name: str) -> List[str]:
     return data.get(ai_name, {}).get("models", [])
 
 
-# Function 7: Update API key of a specific AI
+# Function 7: Update API key of a specific AI (via env var - JSON is no longer used)
 def update_api_key(ai_name: str, new_key: str) -> bool:
-    """Updates the API key for the specified AI vendor."""
-    data = _load_config()
-    if ai_name in data:
-        data[ai_name]["api_key"] = new_key
-        return _save_config(data)
-    return False
+    """Prints instructions for setting the API key via environment variable."""
+    env_var = ENV_VAR_MAP.get(ai_name)
+    if not env_var:
+        print(f"[!] Unknown AI vendor '{ai_name}'.")
+        return False
+    print("[!] API keys are no longer stored in config files.")
+    print(f"    Set the {env_var} environment variable instead:")
+    print(f"    $env:{env_var} = '{new_key}'  (PowerShell)")
+    print(f"    export {env_var}={new_key}       (bash)")
+    return True
 
 
 # Function 8: Update default model of a specific AI
@@ -151,11 +172,11 @@ def update_ai_specific_default_model(ai_name: str, new_model: str) -> bool:
 
 # --- ADDITIONAL UTILITIES (From your original list) ---
 
-def add_ai_provider(ai_name: str, api_key: str, default_model: str, models: List[str]) -> bool:
-    """Adds a new AI provider to the configuration file."""
+def add_ai_provider(ai_name: str, default_model: str, models: List[str]) -> bool:
+    """Adds a new AI provider to the configuration file.
+    Note: API keys are set via environment variables, not stored in config."""
     data = _load_config()
     data[ai_name] = {
-        "api_key": api_key,
         "default_model": default_model,
         "models": models
     }

@@ -2,7 +2,6 @@
     "default_model": "gemini-2.5-flash",
     "default_provider": "gemini",
     "gemini": {
-        "api_key": "AIzaSyA0wRjHzt5lPbBNRlnkPNznNdSaKkNKHe8",
         "default_model": "gemini-2.5-flash",
         "models": [
             "gemini-3-pro-preview",
@@ -13,7 +12,6 @@
         ]
     },
     "chatgpt": {
-        "api_key": "YOUR_CHATGPT_API_KEY",
         "default_model": "gpt-4o",
         "models": [
             "gpt-4o-mini",
@@ -27,7 +25,6 @@
         ]
     },
     "ollama": {
-        "api_key": "http://localhost:11434",
         "default_model": "llama3",
         "models": [
             "llama3",
@@ -39,7 +36,6 @@
         ]
     },
     "openrouter": {
-        "api_key": "YOUR_OPENROUTER_API_KEY",
         "default_model": "z-ai/glm-4.5-air:free",
         "models": [
             "z-ai/glm-4.5-air:free",

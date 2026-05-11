@@ -7,28 +7,20 @@
 
 import sys
 import subprocess
-from .utils.agent_configs import update_api_key, get_available_ais, get_default_provider
+from .utils.agent_configs import ENV_VAR_MAP, get_available_ais, get_default_provider
 from .utils.agent_management import AI_MANAGEMENT_OPTIONS, agent_management
 
 # --- Set API key ---
 def set_api_keys():
     try:
-        available_ais = get_available_ais()
+        print("KaliGPT now reads API keys from environment variables only.\n")
+        for ai in get_available_ais():
+            env_var = ENV_VAR_MAP.get(ai, "?")
+            print(f"  {ai}: set {env_var}")
 
-        ais = ""
-        for ai in available_ais:
-            ais += f"{available_ais.index(ai) + 1}. {ai}\n"
-        print(f"Available AI Vendors:\n{ais}")
-        selected = int(input("Select AI Vendor by number: ")) - 1
-        if 0 <= selected < len(available_ais):
-            selected_ai = available_ais[selected]
-            new_key = input(f"Enter new API key for {selected_ai}: ")
-            if update_api_key(selected_ai, new_key):
-                print(f"[+] API key for {selected_ai} updated successfully.")
-            else:
-                print(f"[!] Failed to update API key for {selected_ai}.")
-        else:
-            print("[!] Invalid selection.")
+        print("\nTo set a key permanently, add to your shell profile:")
+        print("  PowerShell:  [System.Environment]::SetEnvironmentVariable('GEMINI_API_KEY','your-key','User')")
+        print("  bash/zsh:    export GEMINI_API_KEY='your-key'  (add to ~/.bashrc)")
 
     except KeyboardInterrupt:
         print("\nSee You,\nExiting Setup - KeyBoardInterrupt")
