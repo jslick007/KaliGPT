@@ -10,7 +10,7 @@ from openai import OpenAI
 import sys
 
 from .utils.prompts import WEB_BUG_BOUNTY_AGENT as SYSTEM_PROMPT
-from .utils.agent_configs import get_api_key, get_ai_specific_default_model
+from .utils.agent_configs import get_api_key, get_ai_specific_default_model, get_vendor_specific_all_models
 from .utils.tools import get_tools_info
 from .utils.agent_management import agent_management, AI_MANAGEMENT_OPTIONS
 from .utils.openai_tool_adapter import openai_tool_adapter
@@ -23,6 +23,17 @@ OPENAI_MODEL: str
 TOOLS_INFO: list
 client: OpenAI
 TOOL_FUNCTION_MAP: dict
+OPENAI_MODELS: list = []
+MODEL_INDEX: int = 0
+
+
+def cycle_openai_model():
+    global OPENAI_MODEL, MODEL_INDEX
+    if not OPENAI_MODELS:
+        return
+    MODEL_INDEX = (MODEL_INDEX + 1) % len(OPENAI_MODELS)
+    OPENAI_MODEL = OPENAI_MODELS[MODEL_INDEX]
+    print(f"[!] Switching to fallback model: {OPENAI_MODEL}")
 
 
 def initialize_configs():

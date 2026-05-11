@@ -40,7 +40,7 @@ def _is_429_error(e: Exception) -> bool:
     return status == 429
 
 
-def _wait_for_429(e: Exception):
+def _wait_for_429(e: Exception, on_retry=None):
     wait = None
     
     # 1. Try headers
@@ -74,11 +74,15 @@ def _wait_for_429(e: Exception):
         wait = 15
         
     print(f"\n[!] Rate limited (429). Retrying in {wait}s...")
+    
+    if on_retry:
+        on_retry()
+        
     time.sleep(wait)
 
 
 
-def retry_on_429(fn):
+def retry_on_429(fn, on_retry=None):
     """Call fn(), retrying on 429 rate-limit errors indefinitely with Retry-After backoff.
 
     Handles:
@@ -96,10 +100,10 @@ def retry_on_429(fn):
         except Exception as e:
             if not _is_429_error(e):
                 raise
-            _wait_for_429(e)
+            _wait_for_429(e, on_retry=on_retry)
 
 
-def retry_stream(factory):
+def retry_stream(factory, on_retry=None):
     """Generator that yields from factory(), retrying the entire stream on 429 indefinitely.
 
     Unlike retry_on_429(), this handles the case where the SDK returns a lazy
@@ -119,4 +123,4 @@ def retry_stream(factory):
         except Exception as e:
             if not _is_429_error(e):
                 raise
-            _wait_for_429(e)
+            _wait_for_429(e, on_retry=on_retry)

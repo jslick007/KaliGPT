@@ -11,7 +11,7 @@ import sys
 import time
 
 from .utils.prompts import WEB_BUG_BOUNTY_AGENT as SYSTEM_PROMPT
-from .utils.agent_configs import get_api_key, get_ai_specific_default_model
+from .utils.agent_configs import get_api_key, get_ai_specific_default_model, get_vendor_specific_all_models
 from .utils.tools import get_tools_info
 from .utils.agent_management import agent_management, AI_MANAGEMENT_OPTIONS
 from .utils.retry import retry_stream
@@ -22,13 +22,30 @@ GEMINI_MODEL: str
 TOOLS_INFO: list
 client = None
 TOOL_FUNCTION_MAP: dict
+GEMINI_MODELS: list = []
+MODEL_INDEX: int = 0
+
+
+def cycle_gemini_model():
+    global GEMINI_MODEL, MODEL_INDEX
+    if not GEMINI_MODELS:
+        return
+    MODEL_INDEX = (MODEL_INDEX + 1) % len(GEMINI_MODELS)
+    GEMINI_MODEL = GEMINI_MODELS[MODEL_INDEX]
+    print(f"[!] Switching to fallback model: {GEMINI_MODEL}")
 
 
 def initialize_configs():
-    global GEMINI_API_KEY, GEMINI_MODEL, client, TOOLS_INFO, TOOL_FUNCTION_MAP
+    global GEMINI_API_KEY, GEMINI_MODEL, client, TOOLS_INFO, TOOL_FUNCTION_MAP, GEMINI_MODELS, MODEL_INDEX
     try:
         GEMINI_API_KEY = get_api_key("gemini")
         GEMINI_MODEL = get_ai_specific_default_model("gemini")
+        GEMINI_MODELS = get_vendor_specific_all_models("gemini")
+        
+        if GEMINI_MODELS and GEMINI_MODEL in GEMINI_MODELS:
+            MODEL_INDEX = GEMINI_MODELS.index(GEMINI_MODEL)
+        else:
+            MODEL_INDEX = 0
 
         if not GEMINI_API_KEY or "AIza" not in GEMINI_API_KEY:
             print("[!] GEMINI API Key not Found. exiting!")
@@ -89,7 +106,8 @@ def get_gemini_response(history: list[types.Content], new_input: str, tools: lis
                     tools=tools,
                     system_instruction=current_system_instruction,
                 ),
-            )
+            ),
+            on_retry=cycle_gemini_model
         )
 
         full_text = ""
