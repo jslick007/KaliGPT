@@ -1,15 +1,20 @@
 {
-    "default_model": "gemini-3-flash-preview",
+    "default_model": "gemma-4-31-b-it",
     "default_provider": "gemini",
     "gemini": {
-        "default_model": "gemini-3-flash-preview",
+        "default_model": "gemma-4-31-b-it",
         "models": [
+            "gemma-4-26-b-a4b-it",
+            "gemini-3-pro-preview",
+            "gemini-3.1-pro-preview",
+            "gemini-3-flash-preview",
             "gemini-3-flash-lite-preview",
+            "gemini-3.1-flash-preview",
             "gemini-3-pro-preview",
             "gemini-3-flash-preview",
             "gemini-2.5-flash",
             "gemini-2.5-pro",
-            "gemini-1.5-flash-latest"
+            "gemini-2.0-flash"
         ]
     },
     "chatgpt": {

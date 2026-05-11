@@ -130,7 +130,7 @@ def ask(user_input, history, tools):
 
     while True:
         try:
-            stream = retry_stream(lambda: request_resp(messages=messages, tools=tools))
+            stream = retry_stream(lambda: request_resp(messages=messages, tools=tools), on_retry=cycle_ollama_model)
 
             tool_calls = []
             full_content = ""
