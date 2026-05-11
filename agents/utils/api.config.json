@@ -2,7 +2,7 @@
     "default_model": "gemini-2.5-flash",
     "default_provider": "gemini",
     "gemini": {
-        "api_key": "YOUR_GEMINI_API_KEY",
+        "api_key": "AIzaSyA0wRjHzt5lPbBNRlnkPNznNdSaKkNKHe8",
         "default_model": "gemini-2.5-flash",
         "models": [
             "gemini-3-pro-preview",
@@ -69,5 +69,3 @@
         ]
     }
 }
-
-

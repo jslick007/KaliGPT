@@ -12,7 +12,7 @@ import time
 
 from .utils.parse_n_print_response import parse_n_print_response
 from .utils.prompts import WEB_BUG_BOUNTY_AGENT as SYSTEM_PROMPT
-from .utils.agent_configs import get_api_key, get_default_model, get_ai_specific_default_model
+from .utils.agent_configs import get_api_key, get_ai_specific_default_model
 from .utils.tools import get_tools_info
 from .utils.agent_management import agent_management, AI_MANAGEMENT_OPTIONS
 
@@ -31,7 +31,7 @@ def initialize_configs():
         GEMINI_MODEL = get_ai_specific_default_model("gemini")
 
         if not GEMINI_API_KEY or 'AIza' not in GEMINI_API_KEY:
-            print(f"[!] GEMINI API Key not Found. exiting!")
+            print("[!] GEMINI API Key not Found. exiting!")
             sys.exit(0)
 
         # Configure the API for the entire library
@@ -68,7 +68,7 @@ def execute_function_calls(function_calls: list):
         response_parts.append(
             types.Part.from_function_response(name=func_name, response={"result": result_text})
         )
-        print(f"[HackerX Tool Use] Tool result ready to send back.")
+        print("[HackerX Tool Use] Tool result ready to send back.")
     return response_parts
 
 

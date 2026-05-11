@@ -102,7 +102,7 @@ def keyword_search(keyword: str,
         results_by_engine = response.get("results", {})
         # print("Results by engine: ", results_by_engine)
 
-    except Exception as e:
+    except Exception:
         # print(f"Request failed: {e}")
         return [(None, None)]
 
@@ -158,7 +158,7 @@ def crawl_search(search_results: list) -> list[tuple[str | None]]:
             # each website info is in the format of {title: "title", link: "link", content: "content"}
             rag.append({"title": title, "link": link, "content": main_content})
 
-        except Exception as e:
+        except Exception:
             # print(f"Request failed on {link}: {e}")
             rag.append(
                 {"title": title, "link": link, "content": "Failed to retrieve content"}

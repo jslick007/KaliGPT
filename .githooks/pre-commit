@@ -1,0 +1,21 @@
+#!/bin/sh
+# Pre-commit hook: lint & format staged .py files with ruff.
+# Enable: git config core.hooksPath .githooks
+
+set -e
+
+staged=$(git diff --cached --name-only --diff-filter=ACM | grep '\.py$' || true)
+
+if [ -z "$staged" ]; then
+    exit 0
+fi
+
+if ! command -v ruff >/dev/null 2>&1; then
+    echo "⚠️  ruff not found — skipping lint/format. Install with: pip install ruff"
+    exit 0
+fi
+
+echo "$staged" | tr '\n' '\0' | xargs -0 ruff check --fix
+echo "$staged" | tr '\n' '\0' | xargs -0 ruff format
+
+git add -u -- $(echo "$staged" | tr '\n' ' ')

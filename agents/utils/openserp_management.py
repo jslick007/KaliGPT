@@ -30,7 +30,7 @@ def start_openserp_service(working_directory=linux_working_directory) -> str:
         # print(f"OpenSerp service started with PID: {process.pid}")
         return str(process.pid)
 
-    except Exception as e:
+    except Exception:
         # print(f"Failed to start OpenSerp service: {e}")
         return ""
 
@@ -53,7 +53,7 @@ def stop_openserp_service(openserp_pid: str):
             # print(f"OpenSerp service with PID {openserp_pid} has been stopped.")
             return 0  # True
 
-        except Exception as e:
+        except Exception:
             # print(f"Failed to stop OpenSerp service: {e}")
             return 1 # False
 

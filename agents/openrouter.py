@@ -37,7 +37,7 @@ def initialize_agent():
     OPENROUTER_MODEL = get_ai_specific_default_model("openrouter")
 
     if not OPENROUTER_API_KEY or 'sk-or-v1-' not in OPENROUTER_API_KEY:
-      print(f"[!] OPENROUTER API Key not Found or not valid. exiting!")
+      print("[!] OPENROUTER API Key not Found or not valid. exiting!")
       sys.exit(0)
 
     tools = get_tools_info()

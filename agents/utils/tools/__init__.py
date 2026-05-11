@@ -6,6 +6,7 @@
 from .opensearchapi import check_search_connection, search_as_RAG, keyword_search
 from .locals import get_local_server_content, execute_generic_linux_command
 from .web_request_framework import web_request_analysis, get_raw_response
+from .mcp_kali_server import check_mcp_connection, list_mcp_tools, call_mcp_tool, run_kali_command
 
 
 def get_tools_info():
@@ -23,6 +24,10 @@ def get_tools_info():
         execute_generic_linux_command,
         web_request_analysis,
         get_raw_response,
+        check_mcp_connection,
+        list_mcp_tools,
+        call_mcp_tool,
+        run_kali_command,
     ]
 
 

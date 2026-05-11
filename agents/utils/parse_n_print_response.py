@@ -15,7 +15,7 @@ def print_banner():
     """Prints the HackerX banner"""
 
     console2 = Console(width=get_console_width())
-    banner_text = (f"""
+    banner_text = ("""
         ██╗  ██╗ █████╗  ██████╗██╗  ██╗███████╗██████╗  ██╗  ╔██
         ██║  ██║██╔══██╗██╔════╝██║ ██╔╝██╔════╝██╔══██╗ ╚██  ██╝
         ███████║███████║██║     █████╔╝ █████╗  ██████╔╝   ████
