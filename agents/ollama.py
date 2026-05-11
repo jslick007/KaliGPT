@@ -16,6 +16,7 @@ from .utils.tools import get_tools_info
 from .utils.agent_management import AI_MANAGEMENT_OPTIONS, agent_management
 from .utils.openai_tool_adapter import openai_tool_adapter
 from .utils.ollama_tool_think_support_check import model_support_check
+from .utils.debug_logger import log_llm_request, log_llm_response
 
 
 # --- GLOBAL VARIABLES ---
@@ -63,7 +64,8 @@ def initialize_configs():
         sys.exit(1)
 
 
-MAX_TURNS = 6   # user+assistant pairs
+MAX_TURNS = 6
+MAX_TOOL_CALLS = 10
 
 def trim_history(history):
     """ Trim chat history to keep within MAX_TURNS """
@@ -98,79 +100,46 @@ def execute_function_calls(function_calls):
 
 
 def request_resp(messages, tools):
-
+    kwargs = {"model": OLLAMA_MODEL, "messages": messages, "stream": True}
     match SUPPORT_STAGE:
-        case 0:
-            # No thinking & tools supported
-            response = client.chat(
-                model=OLLAMA_MODEL,
-                messages=messages,
-            )
-            return response
-
         case 1:
-            # Thinking supported
-            response = client.chat(
-                model=OLLAMA_MODEL,
-                messages=messages,
-                think=True,
-            )
-            return response
-
+            kwargs["think"] = True
         case 2:
-            # tools supported
-            response = client.chat(
-                model=OLLAMA_MODEL,
-                messages=messages,
-                tools=tools,
-            )
-            return response
-
+            kwargs["tools"] = tools
         case _:
-            # Both Thinking and Tools supported
-            response = client.chat(
-                model=OLLAMA_MODEL,
-                messages=messages,
-                tools=tools,
-                think=True,
-            )
-            return response
+            kwargs["tools"] = tools
+            kwargs["think"] = True
+    return client.chat(**kwargs)
 
 
 def ask(user_input, history, tools):
-    """Ask Ollama Models for Response based on Support Stage
-
-        Stage   Description
-        0       Not Supports both Tool & Thinking
-        1       Supports Thinking
-        2       Supports Tools
-        3       Supports Both Tools & Thinking.
-    """
-
     messages = trim_history(history) + [{"role": "user", "content": user_input}]
-    full_content: str
+    tool_call_count = 0
 
     while True:
         try:
-            response = request_resp(messages=messages, tools=tools)
+            log_llm_request("Ollama", messages)
+            stream = request_resp(messages=messages, tools=tools)
 
             tool_calls = []
             full_content = ""
 
-            if response.message.content:
-                # print(chunk.message.content, end="", flush=True)
-                full_content += response.message.content
-            if response.message.tool_calls:
-                tool_calls.extend(response.message.tool_calls)
+            for chunk in stream:
+                if chunk.message.content:
+                    print(chunk.message.content, end="", flush=True)
+                    full_content += chunk.message.content
+                if chunk.message.tool_calls:
+                    tool_calls = chunk.message.tool_calls
+            print()
 
-            # Append full assistant message to history
             messages.append({
                 "role": "assistant",
                 "content": full_content,
                 "tool_calls": tool_calls
             })
 
-            if tool_calls:
+            if tool_calls and tool_call_count < MAX_TOOL_CALLS:
+                tool_call_count += 1
                 tool_results = execute_function_calls(tool_calls)
                 messages.append({
                     "role": "tool",
@@ -183,10 +152,12 @@ def ask(user_input, history, tools):
             print(f"[!] Error: {e}")
             sys.exit(1)
 
+    log_llm_response("Ollama", full_content)
     return full_content, messages
 
 
 def main(prompt=None):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
     # Initialize chat history with system prompt
     chat_history: list = [{"role": "system", "content": SYSTEM_PROMPT}]
@@ -198,7 +169,7 @@ def main(prompt=None):
     while True:
         try:
             if prompt is None:
-                prompt = str(input("\nYou ➤ "))
+                prompt = str(input("\nYou > "))
 
             if prompt.lower().replace("-", " ").strip() in AI_MANAGEMENT_OPTIONS:
                 agent_management(prompt.lower().replace("-", " ").strip())

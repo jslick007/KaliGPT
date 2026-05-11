@@ -137,7 +137,7 @@ def set_default_model():
     if selected == "Other (Add new)":
 
         custom_model = input(
-            f"{Colors.CYAN}Enter Model Name ➤ {Colors.RESET}"
+            f"{Colors.CYAN}Enter Model Name > {Colors.RESET}"
         ).strip()
 
         if not custom_model:
@@ -157,7 +157,7 @@ def set_default_model():
 
     if updated:
         print(
-            f"\n{Colors.GREEN}Model changed → "
+            f"\n{Colors.GREEN}Model changed -> "
             f"{Colors.BOLD}{SELECTED_VENDOR}/{SELECTED_MODEL}{Colors.RESET}"
         )
         return True

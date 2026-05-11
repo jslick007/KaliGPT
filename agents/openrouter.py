@@ -8,6 +8,7 @@
 
 import sys
 import json
+from types import SimpleNamespace
 from openai import OpenAI
 
 from .utils.agent_configs import get_api_key, get_ai_specific_default_model
@@ -16,6 +17,7 @@ from .utils.parse_n_print_response import parse_n_print_response
 from .utils.tools import get_tools_info
 from .utils.openai_tool_adapter import openai_tool_adapter
 from .utils.prompts import WEB_BUG_BOUNTY_AGENT as SYSTEM_PROMPT
+from .utils.debug_logger import log_llm_request, log_llm_response
 
 # ----- Global Variables
 OPENROUTER_API_KEY: str
@@ -59,7 +61,8 @@ def initialize_agent():
     sys.exit(1)
 
 
-MAX_TURNS = 6   # user + assistant pairs
+MAX_TURNS = 6
+MAX_TOOL_CALLS = 10
 
 def trim_history(history):
     """ Trim chat history to keep within MAX_TURNS """
@@ -103,68 +106,90 @@ def execute_tool_calls(tool_calls):
     return tool_messages
 
 
-def ask(prompt, chat_history, tools=TOOLS_INFO):
-    """Ask OpenRouter model with recursive tool support and proper history."""
+def _stream_completion(messages, tools):
+    """Stream a chat completion, print text as it arrives, return (full_text, tool_calls_dict)."""
+    full_text = ""
+    tool_calls_acc = {}
 
-    # Add the user message to the working set (don't append to persistent history yet)
+    stream = client.chat.completions.create(
+        model=OPENROUTER_MODEL,
+        messages=messages,
+        tools=tools or [],
+        stream=True,
+    )
+
+    for chunk in stream:
+        delta = chunk.choices[0].delta if chunk.choices else None
+        if delta and delta.content:
+            print(delta.content, end="", flush=True)
+            full_text += delta.content
+        if delta and delta.tool_calls:
+            for tc in delta.tool_calls:
+                idx = tc.index
+                if idx not in tool_calls_acc:
+                    tool_calls_acc[idx] = {"id": "", "function": {"name": "", "arguments": ""}}
+                if tc.id:
+                    tool_calls_acc[idx]["id"] = tc.id
+                if tc.function:
+                    if tc.function.name:
+                        tool_calls_acc[idx]["function"]["name"] = tc.function.name
+                    if tc.function.arguments:
+                        tool_calls_acc[idx]["function"]["arguments"] += tc.function.arguments
+    print()
+
+    return full_text, tool_calls_acc
+
+
+def ask(prompt, chat_history, tools=TOOLS_INFO):
     messages = trim_history(chat_history) + [{"role": "user", "content": prompt}]
+    tool_call_count = 0
 
     try:
-        # Step 1: Initial Request
-        completion = client.chat.completions.create(
-            model=OPENROUTER_MODEL,
-            messages=messages,
-            tools=tools,
-            tool_choice="auto" if tools else "none"
-        )
+        log_llm_request("OpenRouter", messages)
+        full_text, tool_calls_acc = _stream_completion(messages, tools)
 
-        response_msg = completion.choices[0].message
+        while tool_calls_acc and tool_call_count < MAX_TOOL_CALLS:
+            tool_call_count += 1
+            tool_calls_list = [tc for tc in tool_calls_acc.values() if tc["id"]]
+            assistant_msg = {"role": "assistant", "content": full_text or None}
+            assistant_msg["tool_calls"] = [
+                {"id": tc["id"], "function": {"name": tc["function"]["name"], "arguments": tc["function"]["arguments"]}}
+                for tc in tool_calls_list
+            ]
+            messages.append(assistant_msg)
 
-        # Step 2: Tool Handling Loop (Handles nested/parallel calls)
-        while response_msg.tool_calls:
-            # Add the model's request to call tools to the history
-            messages.append(response_msg)
-
-            # Execute tools and get "tool" role messages
-            tool_results = execute_tool_calls(response_msg.tool_calls)
+            tool_results = execute_tool_calls(
+                [SimpleNamespace(
+                    id=tc["id"],
+                    function=SimpleNamespace(
+                        name=tc["function"]["name"],
+                        arguments=tc["function"]["arguments"]
+                    )
+                ) for tc in tool_calls_list]
+            )
             messages.extend(tool_results)
 
-            # Get the follow-up from the model
-            follow_up = client.chat.completions.create(
-                model=OPENROUTER_MODEL,
-                messages=messages,
-                tools=tools
-            )
-            response_msg = follow_up.choices[0].message
+            log_llm_request("OpenRouter (tool follow-up)", messages)
+            full_text, tool_calls_acc = _stream_completion(messages, tools)
 
-        # Step 3: Finalize History
-        final_text = response_msg.content or ""
-
-        # Update the actual history object for the next turn
         chat_history.append({"role": "user", "content": prompt})
-        chat_history.append({"role": "assistant", "content": final_text})
-
-        return final_text, chat_history
+        chat_history.append({"role": "assistant", "content": full_text})
+        log_llm_response("OpenRouter", full_text)
+        return full_text, chat_history
 
     except Exception as e:
         error_msg = f"API/Logic Error: {str(e)}"
-        # print(f"[!] {error_msg}")
 
         if "No endpoints found that support tool use" in error_msg:
-            completion = client.chat.completions.create(
-                model=OPENROUTER_MODEL,
-                messages=messages,
-            )
+            full_text, _ = _stream_completion(messages, [])
+            chat_history.append({"role": "assistant", "content": full_text})
+            return full_text, chat_history
 
-            response = completion.choices[0].message
-            chat_history.append({"role": "assistant", "content": response.content})
-
-            return response.content, chat_history
-
-        return error_msg, chat_history  # Ensures we always return a tuple
+        return error_msg, chat_history
 
 
 def main(prompt=None):
+  sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
   initialize_agent()
 
@@ -176,7 +201,7 @@ def main(prompt=None):
   while True:
     try:
       if prompt is None:
-        prompt = input("\nYou ➤ ")
+        prompt = input("\nYou > ")
 
       if prompt.lower().replace("-", " ").strip() in AI_MANAGEMENT_OPTIONS:
         agent_management(prompt.lower().replace("-", " ").strip())

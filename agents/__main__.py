@@ -10,6 +10,8 @@ import subprocess
 from .utils.agent_configs import ENV_VAR_MAP, get_available_ais, get_default_provider
 from .utils.agent_management import AI_MANAGEMENT_OPTIONS, agent_management
 
+sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+
 # --- Set API key ---
 def set_api_keys():
     try:

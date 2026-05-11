@@ -15,6 +15,7 @@ from .utils.prompts import WEB_BUG_BOUNTY_AGENT as SYSTEM_PROMPT
 from .utils.agent_configs import get_api_key, get_ai_specific_default_model
 from .utils.tools import get_tools_info
 from .utils.agent_management import agent_management, AI_MANAGEMENT_OPTIONS
+from .utils.debug_logger import log_llm_request, log_llm_response
 
 # --- GLOBAL VARIABLES ---
 GEMINI_API_KEY: str
@@ -72,81 +73,71 @@ def execute_function_calls(function_calls: list):
     return response_parts
 
 
+MAX_TOOL_CALLS = 10
+
+
 def get_gemini_response(history: list[types.Content], new_input: str, tools: list):
-    """
-    Generates content, including multi-turn tool calling logic, while correctly
-    managing history and enabling Chain-of-Thought (CoT) via system_instruction.
-    """
-
-    # 1. Start the contents list by incorporating the entire history.
-    # The history contains all previous alternating user/model/tool turns.
     contents = history[:]
-
-    # 2. Add the current user input as the new last message.
-    # This is the "newest" turn in the conversation.
     contents.append(
         types.Content(role="user", parts=[types.Part.from_text(text=new_input)])
     )
-
-    # 3. Determine the system instruction for the current turn.
-    # The system instruction should only be passed once per request, but you pass it
-    # for EVERY request to ensure the model *always* has the persona and core rules.
-    # NOTE: If you were using the Caching method from earlier, you would use that here instead
-    # of the system_instruction parameter. We stick to system_instruction for simplicity here.
-
-    # We use the full system instruction string here.
     current_system_instruction = SYSTEM_PROMPT
+    tool_call_count = 0
 
-    # --- The Multi-Turn Tool Loop ---
-    # The entire process (prompt -> tool call -> tool result -> final answer) happens here.
     while True:
-
-        # 4. Call the Model with current contents and config
-        response = client.models.generate_content(
+        log_llm_request("Gemini", contents)
+        stream = client.models.generate_content_stream(
             model=GEMINI_MODEL,
             contents=contents,
             config=types.GenerateContentConfig(
                 tools=tools,
-                # Enable Chain-of-Thought (CoT) support with thinking_budget
                 thinking_config=types.ThinkingConfig(thinking_budget=1),
-                # Set the primary persona/rules here for every turn
-                system_instruction = current_system_instruction
+                system_instruction=current_system_instruction
             ),
         )
 
-        # After the first turn, we don't need to re-send the instruction
-        # (It's still in the model's short-term memory for the current loop, but not history).
+        full_text = ""
+        function_calls = None
+        for chunk in stream:
+            has_fc = chunk.function_calls
+            if has_fc:
+                function_calls = has_fc
+            if not has_fc:
+                try:
+                    if chunk.text:
+                        print(chunk.text, end="", flush=True)
+                        full_text += chunk.text
+                except (ValueError, AttributeError):
+                    pass
+        print()
+
         current_system_instruction = None
 
-        # 5. Check for Function Calls (Simplified check)
-        if response.function_calls:
-
-            function_calls = response.function_calls
+        if function_calls and tool_call_count < MAX_TOOL_CALLS:
+            tool_call_count += 1
             function_response_parts = execute_function_calls(function_calls)
-
-            # Append the model's request (FunctionCall) to the contents
-            contents.append(response.candidates[0].content)
-
-            # Append the tool's result (FunctionResponse) to the contents
+            parts = []
+            if full_text:
+                parts.append(types.Part.from_text(text=full_text))
+            parts.extend([
+                types.Part.from_function_call(name=fc.name, args=dict(fc.args)) for fc in function_calls
+            ])
+            contents.append(types.Content(role="model", parts=parts))
             contents.append(types.Content(role="tool", parts=function_response_parts))
-
-            # Loop continues: The next iteration sends the function results back to the model.
             time.sleep(0.5)
             continue
 
-        # 6. No Function Call -> Final Text Response
-        else:
-            # Append the final model response to the contents list (History)
-            if response.candidates and response.candidates[0].content:
-                contents.append(response.candidates[0].content)
-
-            # The updated contents list IS the new chat history.
-            new_history = contents
-
-            return response.text, new_history
+        contents.append(types.Content(
+            role="model",
+            parts=[types.Part.from_text(text=full_text)]
+        ))
+        log_llm_response("Gemini", full_text)
+        return full_text, contents
 
 
 def main(prompt=None):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+
     chat_history: list[types.Content] = []
 
     initialize_configs()   # initialize configs for gemini
@@ -156,7 +147,7 @@ def main(prompt=None):
     while True:
         try:
             if prompt is None:
-                prompt = input("\nYou ➤ ")
+                prompt = input("\nYou > ")
 
 
             if prompt.lower().replace("-", " ").strip() in AI_MANAGEMENT_OPTIONS:

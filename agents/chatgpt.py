@@ -5,6 +5,7 @@
 # Updated: 24 feb 2026
 
 
+import json
 from openai import OpenAI
 import sys
 
@@ -14,6 +15,7 @@ from .utils.agent_configs import get_api_key, get_ai_specific_default_model
 from .utils.tools import get_tools_info
 from .utils.agent_management import agent_management, AI_MANAGEMENT_OPTIONS
 from .utils.openai_tool_adapter import openai_tool_adapter
+from .utils.debug_logger import log_llm_request, log_llm_response
 
 
 # --- GLOBAL VARIABLES ---
@@ -53,65 +55,91 @@ def initialize_configs():
         sys.exit(1)
 
 
-MAX_TURNS = 6   # user+assistant pairs
+MAX_TURNS = 6
+MAX_TOOL_CALLS = 10
 
 def trim_history(history):
-    """ Trim chat history to keep within MAX_TURNS """
     system = [m for m in history if m["role"] == "system"]
     rest = [m for m in history if m["role"] != "system"]
     return system + rest[-MAX_TURNS * 2:]
 
 
-def get_chatgpt_response(history: list, new_input: str, tools):
+def get_chatgpt_response(history: list, new_input: str, tools, tool_call_count=0):
 
     messages = trim_history(history) + [
         {"role": "user", "content": new_input}
     ]
 
-    response = client.responses.create(
+    log_llm_request("ChatGPT", messages)
+    stream = client.chat.completions.create(
         model=OPENAI_MODEL,
-        input=messages,
-        tools=tools,     # list of tool objects
+        messages=messages,
+        tools=tools,
+        stream=True,
     )
 
-    tool_calls = [o for o in response.output if o.type == "tool_call"]
+    full_text = ""
+    tool_calls_acc = {}
 
-    if tool_calls:
+    for chunk in stream:
+        delta = chunk.choices[0].delta if chunk.choices else None
+        if delta and delta.content:
+            print(delta.content, end="", flush=True)
+            full_text += delta.content
+        if delta and delta.tool_calls:
+            for tc in delta.tool_calls:
+                idx = tc.index
+                if idx not in tool_calls_acc:
+                    tool_calls_acc[idx] = {"id": "", "function": {"name": "", "arguments": ""}}
+                if tc.id:
+                    tool_calls_acc[idx]["id"] = tc.id
+                if tc.function:
+                    if tc.function.name:
+                        tool_calls_acc[idx]["function"]["name"] = tc.function.name
+                    if tc.function.arguments:
+                        tool_calls_acc[idx]["function"]["arguments"] += tc.function.arguments
+    print()
+
+    if tool_calls_acc and tool_call_count < MAX_TOOL_CALLS:
+        tool_calls = [tc for tc in tool_calls_acc.values() if tc["id"]]
         tool_messages = []
-        for call in tool_calls:
+        for tc in tool_calls:
+            func_name = tc["function"]["name"]
+            func_args = json.loads(tc["function"]["arguments"]) if tc["function"]["arguments"] else {}
 
-            if call.name not in TOOL_FUNCTION_MAP:
-                result = f"Tool {call.name} not found"
+            if func_name not in TOOL_FUNCTION_MAP:
+                result = f"Tool {func_name} not found"
             else:
-                result = TOOL_FUNCTION_MAP[call.name](**call.arguments)
+                result = TOOL_FUNCTION_MAP[func_name](**func_args)
 
             tool_messages.append({
                 "role": "tool",
-                "tool_call_id": call.id,
+                "tool_call_id": tc["id"],
                 "content": str(result)
             })
 
+        assistant_msg = {"role": "assistant", "content": full_text or None}
+        assistant_msg["tool_calls"] = [
+            {"id": tc["id"], "function": {"name": tc["function"]["name"], "arguments": tc["function"]["arguments"]}}
+            for tc in tool_calls
+        ]
+
         return get_chatgpt_response(
-            messages + tool_messages,
+            messages + [assistant_msg] + tool_messages,
             "",
-            tools
+            tools,
+            tool_call_count + 1
         )
 
-    # prepare final response
-    final_response = "".join(
-        o.content[0].text
-        for o in response.output
-        if o.type == "message"
-    )
-    # update history
     new_history = messages + [
-        {"role": "assistant", "content": final_response}
+        {"role": "assistant", "content": full_text}
     ]
-
-    return final_response, new_history
+    log_llm_response("ChatGPT", full_text)
+    return full_text, new_history
 
 
 def main(prompt=None):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
     # Initialize chat history with system prompt
     chat_history: list = [{"role": "system", "content": SYSTEM_PROMPT}]
@@ -123,7 +151,7 @@ def main(prompt=None):
     while True:
         try:
             if prompt is None:
-                prompt = input("\nYou ➤ ")
+                prompt = input("\nYou > ")
 
 
             if prompt.lower().replace("-", " ").strip() in AI_MANAGEMENT_OPTIONS:
