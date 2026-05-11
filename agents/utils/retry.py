@@ -40,40 +40,42 @@ def _is_429_error(e: Exception) -> bool:
     return status == 429
 
 
-def _wait_for_429(e: Exception, on_retry=None):
-    wait = None
-    
-    # 1. Try headers
-    resp = getattr(e, "response", None)
-    if resp is not None:
-        headers = getattr(resp, "headers", resp)
-        if not isinstance(headers, dict):
-            try:
-                headers = dict(headers)
-            except (TypeError, ValueError):
-                headers = {}
-        wait = _parse_retry_after(headers)
-    
-    # 2. Try response JSON body
-    if wait is None:
-        # Case A: e.response is a google-genai Response object or similar with a .json() method
-        if resp is not None and hasattr(resp, "json"):
-            try:
-                wait = _extract_delay_from_json(resp.json())
-            except Exception:
-                pass
+def _is_500_error(e: Exception) -> bool:
+    status = getattr(e, "status_code", None) or getattr(e, "code", None)
+    # 500-599 are server errors
+    return status is not None and 500 <= status < 600
+
+
+def _wait_for_error(e: Exception, on_retry=None, is_500=False):
+    if is_500:
+        wait = 5
+    else:
+        wait = None
+        resp = getattr(e, "response", None)
+        if resp is not None:
+            headers = getattr(resp, "headers", resp)
+            if not isinstance(headers, dict):
+                try:
+                    headers = dict(headers)
+                except (TypeError, ValueError):
+                    headers = {}
+            wait = _parse_retry_after(headers)
         
-        # Case B: Try to find a response_json attribute (fallback)
         if wait is None:
-            json_data = getattr(e, "response_json", None)
-            if json_data:
-                wait = _extract_delay_from_json(json_data)
-    
-    # 3. Fallback
-    if wait is None:
-        wait = 15
+            if resp is not None and hasattr(resp, "json"):
+                try:
+                    wait = _extract_delay_from_json(resp.json())
+                except Exception:
+                    pass
+            if wait is None:
+                json_data = getattr(e, "response_json", None)
+                if json_data:
+                    wait = _extract_delay_from_json(json_data)
         
-    print(f"\n[!] Rate limited (429). Retrying in {wait}s...")
+        if wait is None:
+            wait = 15
+            
+    print(f"\n[!] Server error ({getattr(e, 'status_code', getattr(e, 'code', 'Unknown'))}). Retrying in {wait}s...")
     
     if on_retry:
         on_retry()
@@ -81,46 +83,63 @@ def _wait_for_429(e: Exception, on_retry=None):
     time.sleep(wait)
 
 
-
 def retry_on_429(fn, on_retry=None):
-    """Call fn(), retrying on 429 rate-limit errors indefinitely with Retry-After backoff.
-
-    Handles:
-      - openai.RateLimitError  (.status_code, .response.headers)
-      - google.genai.errors.ClientError (.code, .response.headers)
-      - ollama.ResponseError   (.status_code)
-
-    NOTE: if fn() returns a generator/stream, the 429 may be raised lazily
-    during iteration rather than inside fn().  For streams use retry_stream()
-    instead.
+    """Call fn(), retrying on 429 (indefinitely) and 500 (up to 3x) errors.
+    
+    If 500 errors exceed 3 attempts, it triggers on_retry to cycle the model.
     """
+    count_500 = 0
     while True:
         try:
             return fn()
         except Exception as e:
-            if not _is_429_error(e):
-                raise
-            _wait_for_429(e, on_retry=on_retry)
+            if _is_429_error(e):
+                _wait_for_error(e, on_retry=on_retry, is_500=False)
+                continue
+            
+            if _is_500_error(e):
+                count_500 += 1
+                if count_500 <= 3:
+                    print(f"\n[!] Server error 500 (Attempt {count_500}/3). Retrying in 5s...")
+                    time.sleep(5)
+                    continue
+                else:
+                    print("\n[!] Server error 500 persisted after 3 attempts. Cycling model...")
+                    _wait_for_error(e, on_retry=on_retry, is_500=False) # Trigger model cycle
+                    count_500 = 0
+                    continue
+            
+            raise e
 
 
 def retry_stream(factory, on_retry=None):
-    """Generator that yields from factory(), retrying the entire stream on 429 indefinitely.
-
-    Unlike retry_on_429(), this handles the case where the SDK returns a lazy
-    generator and the 429 error is raised during iteration rather than during
-    the initial call to ``factory()`` (e.g. google-genai's
-    generate_content_stream).
-
-    Usage::
-
-        for chunk in retry_stream(lambda: client.models.generate_content_stream(...)):
-            ...
+    """Generator that yields from factory(), retrying on 429/500 errors.
+    
+    If 500 errors exceed 3 attempts, it triggers on_retry to cycle the model.
     """
+    count_500 = 0
     while True:
         try:
             yield from factory()
             return
         except Exception as e:
-            if not _is_429_error(e):
-                raise
-            _wait_for_429(e, on_retry=on_retry)
+            if _is_429_error(e):
+                _wait_for_error(e, on_retry=on_retry, is_500=False)
+                continue
+            
+            if _is_500_error(e):
+                count_500 += 1
+                if count_500 <= 3:
+                    print(f"\n[!] Server error 500 (Attempt {count_500}/3). Retrying in 5s...")
+                    time.sleep(5)
+                    continue
+                else:
+                    print("\n[!] Server error 500 persisted after 3 attempts. Cycling model...")
+                    _wait_for_error(e, on_retry=on_retry, is_500=False) # Trigger model cycle
+                    count_500 = 0
+                    continue
+            
+            raise e
+
+
+
