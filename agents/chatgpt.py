@@ -119,7 +119,7 @@ def main(prompt=None):
     initialize_configs()   # initialize configs for OpenAI ChatGPT
 
     # Print tool banner
-    print(f"㉿ HackerX ( openai/{OPENAI_MODEL} )")
+    print(f"> HackerX ( openai/{OPENAI_MODEL} )")
     while True:
         try:
             if prompt is None:

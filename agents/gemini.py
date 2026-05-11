@@ -152,7 +152,7 @@ def main(prompt=None):
     initialize_configs()   # initialize configs for gemini
 
     # Print tool banner
-    print(f"㉿ HackerX ( Gemini/{GEMINI_MODEL} )")
+    print(f"> HackerX ( Gemini/{GEMINI_MODEL} )")
     while True:
         try:
             if prompt is None:

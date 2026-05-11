@@ -24,7 +24,7 @@ def print_banner():
         ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝  ═     ═
               HackerX CLI (KaliGPT v1.3) - by SudoHopeX
     """)
-    console2.print(Panel(banner_text, subtitle="( ㉿ HackerX )", border_style="blue", padding=(1, 2)))
+    console2.print(Panel(banner_text, subtitle="( > HackerX )", border_style="blue", padding=(1, 2)))
 
 
 def parse_n_print_response(api_response_text: str):

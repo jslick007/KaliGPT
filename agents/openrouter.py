@@ -171,7 +171,7 @@ def main(prompt=None):
   # Initialize chat history with system prompt
   chat_history: list = [{"role": "system", "content": SYSTEM_PROMPT}]
 
-  print(f"㉿ HackerX ( openrouter/{OPENROUTER_MODEL} )")
+  print(f"> HackerX ( openrouter/{OPENROUTER_MODEL} )")
 
   while True:
     try:

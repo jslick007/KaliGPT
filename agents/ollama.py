@@ -194,7 +194,7 @@ def main(prompt=None):
     initialize_configs()   # initialize configs for Ollama
 
     # Print tool banner
-    print(f"㉿ HackerX ( ollama/{OLLAMA_MODEL} )")
+    print(f"> HackerX ( ollama/{OLLAMA_MODEL} )")
     while True:
         try:
             if prompt is None:
