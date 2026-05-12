@@ -1,20 +1,21 @@
 {
-    "default_model": "gemma-4-31b-it",
+    "default_model": "gemini-2.5-flash",
     "default_provider": "gemini",
     "gemini": {
-        "default_model": "gemma-4-31b-it",
+        "default_model": "gemini-2.5-flash",
         "models": [
-            "gemma-4-26b-a4b-it",
             "gemini-3-pro-preview",
             "gemini-3.1-pro-preview",
             "gemini-3-flash-preview",
             "gemini-3-flash-lite-preview",
             "gemini-3.1-flash-preview",
-            "gemini-3-pro-preview",
-            "gemini-3-flash-preview",
             "gemini-2.5-flash",
             "gemini-2.5-pro",
             "gemini-2.0-flash"
+        ],
+        "text_only_models": [
+            "gemma-4-31b-it",
+            "gemma-4-26b-a4b-it"
         ]
     },
     "chatgpt": {
@@ -28,7 +29,8 @@
             "gpt-5.2-pro-2025-12-11",
             "gpt-5-mini-2025-08-07",
             "gpt-oss-120b"
-        ]
+        ],
+        "text_only_models": []
     },
     "ollama": {
         "default_model": "llama3",
@@ -39,7 +41,8 @@
             "gpt-oss:120b-cloud",
             "qwen3",
             "qwen3:14b"
-        ]
+        ],
+        "text_only_models": []
     },
     "openrouter": {
         "default_model": "z-ai/glm-4.5-air:free",
@@ -64,10 +67,10 @@
             "anthropic/claude-opus-4.1",
             "anthropic/claude-sonnet-4",
             "x-ai/grok-4.1-fast",
-            "x-ai/grok-4.1-fast",
             "x-ai/grok-4",
             "x-ai/grok-3-mini",
             "x-ai/grok-3"
-        ]
+        ],
+        "text_only_models": []
     }
 }
