@@ -11,7 +11,12 @@ import sys
 import time
 
 from .utils.prompts import WEB_BUG_BOUNTY_AGENT as SYSTEM_PROMPT
-from .utils.agent_configs import get_api_key, get_ai_specific_default_model, get_vendor_specific_all_models
+from .utils.agent_configs import (
+    get_api_key,
+    get_ai_specific_default_model,
+    get_vendor_specific_all_models,
+    get_vendor_text_only_models,
+)
 from .utils.tools import get_tools_info
 from .utils.agent_management import agent_management, AI_MANAGEMENT_OPTIONS
 from .utils.retry import retry_stream
@@ -23,7 +28,14 @@ TOOLS_INFO: list
 client = None
 TOOL_FUNCTION_MAP: dict
 GEMINI_MODELS: list = []
+GEMINI_TOOL_MODELS: set = set()  # noqa: F841 — used in model_supports_tools()
 MODEL_INDEX: int = 0
+
+
+def model_supports_tools(model_name: str = None) -> bool:
+    """Check if the given (or current) model supports tool/function calling."""
+    name = model_name or GEMINI_MODEL
+    return name in GEMINI_TOOL_MODELS
 
 
 def cycle_gemini_model():
@@ -32,19 +44,31 @@ def cycle_gemini_model():
         return
     MODEL_INDEX = (MODEL_INDEX + 1) % len(GEMINI_MODELS)
     GEMINI_MODEL = GEMINI_MODELS[MODEL_INDEX]
-    print(f"[!] Switching to fallback model: {GEMINI_MODEL}")
+    tool_status = "tools" if model_supports_tools() else "text-only"
+    print(f"[!] Switching to fallback model: {GEMINI_MODEL} ({tool_status})")
 
 
 def initialize_configs():
-    global GEMINI_API_KEY, GEMINI_MODEL, client, TOOLS_INFO, TOOL_FUNCTION_MAP, GEMINI_MODELS, MODEL_INDEX
+    global \
+        GEMINI_API_KEY, \
+        GEMINI_MODEL, \
+        client, \
+        TOOLS_INFO, \
+        TOOL_FUNCTION_MAP, \
+        GEMINI_MODELS, \
+        GEMINI_TOOL_MODELS, \
+        MODEL_INDEX
     try:
         GEMINI_API_KEY = get_api_key("gemini")
         GEMINI_MODEL = get_ai_specific_default_model("gemini")
-        GEMINI_MODELS = get_vendor_specific_all_models("gemini")
-        
-        if GEMINI_MODELS and GEMINI_MODEL in GEMINI_MODELS:
+        tool_models = get_vendor_specific_all_models("gemini")
+        GEMINI_MODELS = tool_models + get_vendor_text_only_models("gemini")
+        GEMINI_TOOL_MODELS = set(tool_models)
+
+        # Find the current model in the combined list
+        try:
             MODEL_INDEX = GEMINI_MODELS.index(GEMINI_MODEL)
-        else:
+        except ValueError:
             MODEL_INDEX = 0
 
         if not GEMINI_API_KEY or "AIza" not in GEMINI_API_KEY:
@@ -75,11 +99,11 @@ def execute_function_calls(function_calls: list):
         # Safety check: ensure 'call' is a FunctionCall object with 'name' and 'args'
         func_name = getattr(call, "name", None)
         func_args = getattr(call, "args", None)
-        
+
         if not func_name:
             print(f"[!] Invalid tool call received: {call}")
             continue
-            
+
         if not isinstance(func_args, dict):
             func_args = dict(func_args) if func_args else {}
 
@@ -104,7 +128,10 @@ def get_gemini_response(history: list[types.Content], new_input: str, tools: lis
     contents.append(types.Content(role="user", parts=[types.Part.from_text(text=new_input)]))
     current_system_instruction = SYSTEM_PROMPT
     tool_call_count = 0
-    tool_call_count = 0
+
+    # Text-only models cannot use tools — skip passing them
+    can_use_tools = model_supports_tools()
+    active_tools = tools if can_use_tools else None
 
     while True:
         print("... requesting stream ...", end="\r")
@@ -113,16 +140,16 @@ def get_gemini_response(history: list[types.Content], new_input: str, tools: lis
                 model=GEMINI_MODEL,
                 contents=contents,
                 config=types.GenerateContentConfig(
-                    tools=tools,
+                    tools=active_tools,
                     system_instruction=current_system_instruction,
                 ),
             ),
-            on_retry=cycle_gemini_model
+            on_retry=cycle_gemini_model,
         )
 
         full_text = ""
         function_calls = None
-        
+
         # Debug: check if stream is actually a generator
         if stream is None:
             print("\n[!] Error: retry_stream returned None")
@@ -131,14 +158,13 @@ def get_gemini_response(history: list[types.Content], new_input: str, tools: lis
         for chunk in stream:
             if not chunk.candidates:
                 continue
-            
+
             content = chunk.candidates[0].content
             if not content or not content.parts:
                 continue
 
             for part in content.parts:
                 if part.function_call:
-                    # Accumulate function calls
                     if function_calls is None:
                         function_calls = []
                     function_calls.append(part.function_call)
@@ -151,55 +177,69 @@ def get_gemini_response(history: list[types.Content], new_input: str, tools: lis
         print()
         print(f"Stream ended. Length: {len(full_text)} chars. Tool calls: {bool(function_calls)}")
 
-
         if function_calls and tool_call_count < MAX_TOOL_CALLS:
             tool_call_count += 1
             function_response_parts = execute_function_calls(function_calls)
             parts = []
             if full_text:
                 parts.append(types.Part.from_text(text=full_text))
-            parts.extend([
-                types.Part.from_function_call(name=getattr(fc, "name", "unknown"), args=dict(getattr(fc, "args", {}))) 
-                for fc in function_calls
-            ])
+            parts.extend(
+                [
+                    types.Part.from_function_call(
+                        name=getattr(fc, "name", "unknown"), args=dict(getattr(fc, "args", {}))
+                    )
+                    for fc in function_calls
+                ]
+            )
             contents.append(types.Content(role="model", parts=parts))
             contents.append(types.Content(role="tool", parts=function_response_parts))
             time.sleep(0.5)
             continue
-        
-        # --- AUTO-EXECUTION TRIGGER ---
-        # If the model only planned but didn't execute, and we are in a tool-capable context
-        planning_keywords = ["plan", "action", "step", "let's start", "i will now", "reconnaissance", "initial check"]
-        text_lower = full_text.lower()
-        is_planning = any(kw in text_lower for kw in planning_keywords)
-        
-        if not function_calls and (is_planning or len(full_text) > 300) and correction_count < 5:
-            if correction_count < 3:
-                print("\n[HackerX Auto-Execute] Model is stuck in planning. Forcing action...")
-                return get_gemini_response(
-                    history=contents, 
-                    new_input="STOP PLANNING. You have already described your plan. Execute the first tool call in your plan IMMEDIATELY. Do not explain yourself, just call the tool.", 
-                    tools=tools,
-                    correction_count=correction_count + 1
-                )
-            else:
-                # HARD OVERRIDE: Inject tool list and strict command into history
-                tool_names = [getattr(t, "name", "unknown") for t in tools] if tools else []
-                tool_list_str = ", ".join(tool_names)
-                print("\n[HackerX Hard-Override] Model still refusing to call tools. Injecting strict instruction...")
-                
-                # Add a system-like nudge to the history
-                contents.append(types.Content(
-                    role="user", 
-                    parts=[types.Part.from_text(text=f"SYSTEM OVERRIDE: You are failing to execute tools. You MUST now use a `function_call` to execute one of these tools: [{tool_list_str}]. Do NOT describe the action in text. Call the tool NOW.")]
-                ))
-                
-                return get_gemini_response(
-                    history=contents, 
-                    new_input="EXECUTE NOW.", 
-                    tools=tools,
-                    correction_count=correction_count + 1
-                )
+
+        # --- AUTO-EXECUTION TRIGGER (tool-capable models only) ---
+        if can_use_tools and not function_calls and correction_count < 5:
+            planning_keywords = [
+                "plan",
+                "action",
+                "step",
+                "let's start",
+                "i will now",
+                "reconnaissance",
+                "initial check",
+            ]
+            text_lower = full_text.lower()
+            is_planning = any(kw in text_lower for kw in planning_keywords)
+
+            if is_planning or len(full_text) > 300:
+                if correction_count < 3:
+                    print("\n[HackerX Auto-Execute] Model is stuck in planning. Forcing action...")
+                    return get_gemini_response(
+                        history=contents,
+                        new_input="STOP PLANNING. You have already described your plan. Execute the first tool call in your plan IMMEDIATELY. Do not explain yourself, just call the tool.",
+                        tools=tools,
+                        correction_count=correction_count + 1,
+                    )
+                else:
+                    tool_names = [getattr(t, "name", "unknown") for t in tools] if tools else []
+                    tool_list_str = ", ".join(tool_names)
+                    print(
+                        "\n[HackerX Hard-Override] Model still refusing to call tools. Injecting strict instruction..."
+                    )
+
+                    contents.append(
+                        types.Content(
+                            role="user",
+                            parts=[
+                                types.Part.from_text(
+                                    text=f"SYSTEM OVERRIDE: You are failing to execute tools. You MUST now use a `function_call` to execute one of these tools: [{tool_list_str}]. Do NOT describe the action in text. Call the tool NOW."
+                                )
+                            ],
+                        )
+                    )
+
+                    return get_gemini_response(
+                        history=contents, new_input="EXECUTE NOW.", tools=tools, correction_count=correction_count + 1
+                    )
 
         contents.append(types.Content(role="model", parts=[types.Part.from_text(text=full_text)]))
         return full_text, contents
@@ -223,7 +263,7 @@ def main(prompt=None):
                 agent_management(prompt.lower().replace("-", " ").strip())
                 prompt = None
                 continue
-            
+
             # Handle implicit "proceed" commands to minimize intervention
             if prompt.lower().strip() in ["ok", "continue", "proceed", "go", "yes", "do it"]:
                 prompt = "Proceed with your plan and execute the next step immediately."
