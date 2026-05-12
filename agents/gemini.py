@@ -7,7 +7,9 @@
 
 from google import genai
 from google.genai import types
+import itertools
 import sys
+import threading
 import time
 
 from .utils.prompts import WEB_BUG_BOUNTY_AGENT as SYSTEM_PROMPT
@@ -20,6 +22,36 @@ from .utils.agent_configs import (
 from .utils.tools import get_tools_info
 from .utils.agent_management import agent_management, AI_MANAGEMENT_OPTIONS
 from .utils.retry import retry_stream
+
+
+class Spinner:
+    def __init__(self, message="", chars="|/-\\"):
+        self._message = message
+        self._chars = chars
+        self._running = False
+        self._thread = None
+
+    def __enter__(self):
+        self._running = True
+        self._thread = threading.Thread(target=self._spin, daemon=True)
+        self._thread.start()
+        return self
+
+    def __exit__(self, *args):
+        self._running = False
+        if self._thread:
+            self._thread.join(timeout=0.5)
+        sys.stdout.write("\r" + " " * (len(self._message) + 4) + "\r")
+        sys.stdout.flush()
+
+    def _spin(self):
+        for c in itertools.cycle(self._chars):
+            if not self._running:
+                break
+            sys.stdout.write(f"\r{c} {self._message}")
+            sys.stdout.flush()
+            time.sleep(0.12)
+
 
 # --- GLOBAL VARIABLES ---
 GEMINI_API_KEY: str
@@ -143,18 +175,18 @@ def get_gemini_response(history: list[types.Content], new_input: str, tools: lis
     active_tools = tools if can_use_tools else None
 
     while True:
-        print("... requesting stream ...", end="\r")
-        stream = retry_stream(
-            lambda: client.models.generate_content_stream(
-                model=GEMINI_MODEL,
-                contents=contents,
-                config=types.GenerateContentConfig(
-                    tools=active_tools,
-                    system_instruction=current_system_instruction,
+        with Spinner("requesting stream..."):
+            stream = retry_stream(
+                lambda: client.models.generate_content_stream(
+                    model=GEMINI_MODEL,
+                    contents=contents,
+                    config=types.GenerateContentConfig(
+                        tools=active_tools,
+                        system_instruction=current_system_instruction,
+                    ),
                 ),
-            ),
-            on_retry=cycle_gemini_model,
-        )
+                on_retry=cycle_gemini_model,
+            )
 
         full_text = ""
         function_calls = None
