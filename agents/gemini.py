@@ -92,11 +92,19 @@ def initialize_configs():
         sys.exit(1)
 
 
+MAX_RESULT_CHARS = 25000
+
+
+def _truncate(text: str, max_chars: int = MAX_RESULT_CHARS) -> str:
+    if len(text) > max_chars:
+        return text[:max_chars] + f"\n... [truncated {len(text) - max_chars} chars]"
+    return text
+
+
 def execute_function_calls(function_calls: list):
     response_parts = []
     print("\n[HackerX Tool Use] Owo! I found a tool I need to run! <3")
     for call in function_calls:
-        # Safety check: ensure 'call' is a FunctionCall object with 'name' and 'args'
         func_name = getattr(call, "name", None)
         func_args = getattr(call, "args", None)
 
@@ -111,6 +119,7 @@ def execute_function_calls(function_calls: list):
             print(f"[HackerX Tool Use] Running tool: {func_name} with args: {func_args}")
             try:
                 result_text = TOOL_FUNCTION_MAP[func_name](**func_args)
+                result_text = _truncate(str(result_text))
             except Exception as e:
                 result_text = f"Tool execution failed with error: {e}"
         else:
