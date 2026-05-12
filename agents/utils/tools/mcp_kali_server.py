@@ -17,7 +17,7 @@ KALI_REQUEST_HEADERS = {
 }
 
 
-def check_mcp_connection(timeout: int = 10) -> bool:
+def check_kali_server(timeout: int = 10) -> bool:
     """
     Check if the Kali Linux Tools API Server is reachable.
     """
@@ -28,7 +28,7 @@ def check_mcp_connection(timeout: int = 10) -> bool:
         return False
 
 
-def list_mcp_tools(timeout: int = 10) -> list:
+def list_kali_tools(timeout: int = 10) -> list:
     """
     List available Kali Linux tools from the server.
     Returns a list of tool names that are installed and ready.
@@ -43,7 +43,7 @@ def list_mcp_tools(timeout: int = 10) -> list:
         return [{"error": str(e)}]
 
 
-def call_mcp_tool(tool_name: str, arguments: dict = None, timeout: int = 120) -> dict:
+def run_kali_tool(tool_name: str, arguments: dict = None, timeout: int = 120) -> dict:
     """
     Execute a Kali Linux tool on the remote server.
 
@@ -101,7 +101,7 @@ def run_kali_command(command: str, timeout: int = 120) -> dict:
 
 if __name__ == "__main__":
     print(f"Kali server: {KALI_SERVER_URL}")
-    print(f"Connection: {check_mcp_connection()}")
-    tools = list_mcp_tools()
+    print(f"Connection: {check_kali_server()}")
+    tools = list_kali_tools()
     available = [t["name"] for t in tools if t.get("available")]
     print(f"Available tools ({len(available)}): {', '.join(available)}")

@@ -88,6 +88,15 @@ Testing guidelines:
 - Use oneliners commands with curl and essential tools in Kali Linux
 - Prioritize tools like gau/waybackurls over nmap (use nmap only for new port discovery)
 
+Available Kali server tools (via run_kali_tool):
+  - Network: nmap (scan/version detection), gobuster (dir/dns brute), nikto (web vuln scan)
+  - Web: sqlmap (SQLi), wpscan (WordPress), httpx (HTTP probing), dirb (dir brute)
+  - Cracking: hydra (login brute), john (password cracking)
+  - Recon: enum4linux (SMB), subfinder, assetfinder, waybackurls, nuclei
+  - Other: msfconsole (Metasploit), ffuf (fuzzing), arjun (param discovery), fierce (DNS)
+  - Not all tools are installed; check availability with list_kali_tools first
+  - Use run_kali_tool(tool_name, {args}) or run_kali_command("shell cmd") for full access
+
 Autonomous workflow (continuous loop):
 1. Reconnaissance → Map attack surface → Identify potential issues
 2. Vulnerability scanning → Identify potential issues
