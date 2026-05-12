@@ -38,10 +38,23 @@ def _load_config() -> Dict[str, Any]:
         "gemini": {
             "default_model": "gemini-2.5-flash",
             "models": ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-1.5-flash-latest"],
+            "text_only_models": [],
         },
-        "chatgpt": {"default_model": "gpt-4o", "models": ["gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"]},
-        "ollama": {"default_model": "llama3", "models": ["llama3", "mistral", "qwen3:8b"]},
-        "openrouter": {"default_model": "z-ai/glm-4.5-air:free", "models": ["z-ai/glm-4.5-air:free"]},
+        "chatgpt": {
+            "default_model": "gpt-4o",
+            "models": ["gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"],
+            "text_only_models": [],
+        },
+        "ollama": {
+            "default_model": "llama3",
+            "models": ["llama3", "mistral", "qwen3:8b"],
+            "text_only_models": [],
+        },
+        "openrouter": {
+            "default_model": "z-ai/glm-4.5-air:free",
+            "models": ["z-ai/glm-4.5-air:free"],
+            "text_only_models": [],
+        },
     }
 
     try:
@@ -134,11 +147,18 @@ def get_ai_specific_default_model(ai_name: str) -> Optional[str]:
     return data.get(ai_name, {}).get("default_model")
 
 
-# Function 6: Read and return all models of a specific AI Vendor
+# Function 6: Read and return all tool-capable models of a specific AI Vendor
 def get_vendor_specific_all_models(ai_name: str) -> List[str]:
-    """Returns a list of all known model names for the specified AI vendor."""
+    """Returns a list of tool-capable model names for the specified AI vendor."""
     data = _load_config()
     return data.get(ai_name, {}).get("models", [])
+
+
+# Function 6b: Read and return text-only (non-tool-calling) models
+def get_vendor_text_only_models(ai_name: str) -> List[str]:
+    """Returns a list of text-only model names that do not support tool calling."""
+    data = _load_config()
+    return data.get(ai_name, {}).get("text_only_models", [])
 
 
 # Function 7: Update API key of a specific AI (via env var - JSON is no longer used)
